@@ -45,17 +45,24 @@ RU05 | Acessibilidade Visual | Elementos clicáveis devem ter área consideráve
   ID  | Tópico | Requisito
 ------|--------| ---------
 RC01 | Integridade de Sessão e Dados | O sistema deve impedir a perda do texto digitado no chat ou da imagem enviada caso a conexão oscile durante a requisição.
-RC02 | 
+RC02 | Privacidade e Retenção Controlada (LGPD) | Informações sensíveis inseridas pelo usuário (como salário) não devem ser expostas publicamente e devem poder ser apagadas a qualquer momento.
+RC03 | Tratamento e Tolerância de Falhas de Entrada | O sistema deve tratar falhas de conexão ou imagens completamente ilegíveis emitindo mensagens claras e orientando uma nova tentativa sem travar o navegador.
+
 
 ## Desempenho
 
   ID  | Tópico | Requisito
 ------|--------| ---------
-RD01
+RD01 | Tempo de Carregamento de Tela | A página inicial e o histórico de contratos salvos devem carregar completamente em até 4 segundos em conexões em 4G
+RD02 | Feedback de Processamento Assíncrono | Para processos demorados (OCR e inferência de IA), o sistema deve exibir indicadores visuais de carregamento em até 1 segundo.
+RD03 | Tempo Limite de Resposta (Timeout) | Requisições para APIs de OCR e IA devem ter um tempo limite estabelecido avisando o usuário se o serviço demorar a responder em vez de mantê-lo aguardando indefinidamente.
 
 ## Facilidade de Suporte
 
   ID  | Tópico | Requisito
 ------|--------| ---------
-RS01
+RS01 | Arquitetura Desacoplada | O frontend web deve comunicar-se com o backend ou APIs de IA por meio de uma arquitetura REST clara (formato JSON), facilitando a troca do modelo de IA ou motor de OCR sem quebrar a interface.
+RS02 | Compatibilidade Multiplataforma | A aplicação web deve funcionar uniformemente nos principais navegadores móveis modernos sem necessidade de instalação nativa.
+RS03 | Registro de Erros | Falhas de processamento de IA e erros de leitura de imagem devem registrar logs de erro estruturados no backend para depuração rápida pela equipe.
+RS04 | Facilidade de Implantação | O código deve ser versionado via Git e configurado para integração e implantação contínua (CI/CD) em serviços de hospedagem em nuvem gratuitos ou acessíveis.
 
