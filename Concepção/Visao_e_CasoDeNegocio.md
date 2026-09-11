@@ -25,92 +25,96 @@ O projeto visa auxiliar analfabetos funcionais na interpretação de contratos c
 ### Termos do domínio Jurídico/Contratual
 -   LGPD(Lei Geral de Proteção de Dados): Legislação brasileira que regula o tratamento e privacidade de dados pessoais físicss e digitais.    
 
-    ## 📜 Lista de riscos + plano de Gestão dos riscos
-    ### RISCOS
-    - Leitura/Análise imprecisa do agente ao escanear fotos de contratos com baixa qualidade
-    - Falta de detalhes pode levar a categorização incorreta dos tipos de contratos
-    - O agente pode acabar perguntando repetidamente por detalhes sobre o usuário, nos quais já poderia estar armazenados em seu banco de dados.    
+## 📜 Lista de riscos + plano de Gestão dos riscos
+### RISCOS
+* **R1 - Leitura Imprecisa do OCR:** Qualidade ruim da imagem (foto escura, desfocada ou cortada) resultando em extração incorreta de cláusulas.
+* **R2 - Ambiguidade e Erro de Categorização:** Documentos curtos ou incompletos levando a IA a classificar o contrato na categoria errada.
+* **R3 - Fritura de Experiência (Perguntas Repetitivas):** O assistente solicitar repetidamente dados do usuário que já foram informados em interações anteriores.
+* **R4 - Sensibilidade de Dados (LGPD):** Vazamento ou retenção indevida de dados pessoais e financeiros extraídos do documento ou digitados no chat. 
 
-    ### GESTÃO DOS RISCOS
-    - O agente irá procurar ou pedir detalhes adicionais sobre o contrato para poder categorizar comm precisão o tipo do contrato (residencial, comércio, trabalho). 
-    - Implementação de uma estrutura de dados para armazenar informações de usuários.
-    - 
-    
-    ## 🛠️ Protótipos e provas de conceitos
-    
+### GESTÃO DOS RISCOS
+| ID | Ação de Mitigação (Prevenção) | Plano de Contingência (Tratamento) |
+| :--- | :--- | :--- |
+| R1 | Validador visual no aplicativo que exige confirmação de nitidez do usuário (RU03) antes do processamento. | Exibir alerta de baixa legibilidade e solicitar nova captura focada na página relevante. |
+| R2 | Algoritmo de onboarding com diálogo guiado: a IA faz 1 ou 2 perguntas diretas de múltipla escolha para definir o tipo de contrato. | Permitir que o usuário altere manualmente a categoria do documento no painel. |
+| R3 | Implementação de estrutura de dados local/banco temporário para persistir contexto de sessão e preferências do perfil. | Oferecer atalho "Usar dados salvos no meu perfil" nas interações da IA. |
+| R4 | Anonimização automática de nomes e documentos (CPF/RG) antes de enviar o texto às APIs de IA. | Permitir limpeza instantânea de histórico e exclusão completa dos dados salvos no app (RC02). |
 
-    ## 💡 Plano de iteração
-    1. Upload de `Contrato`
-    2. Validação da captura ()
-    3. Extração de texto (OCR)
-    4. Exibição do conteúdo extraído, validando se a captura funciona de forma confiável antes de integrar a camada de IA. // Colocar em bullet points
-    
-    ## 🛠️ Plano de desenvolvimento de software
-    ### 1. ⚡ Metodologia de Desenvolvimento
-    * **Processo:** Metodologia Ágil adaptada (Scrum/Kanban).
-    * **Ciclos de Entrega:** Sprints semanais com Dailies para acompanhamento.
-    * **Quadro de Tarefas:** Gestão visual das demandas via Trello e Issues do Github.
-
-    ---
-
-    ### 2. 💻 Stack Tecnológica Selecionada
-    * **Frontend:** Web Mobile-First (React / Next.js).
-    * **Backend:** API REST (Node.js/Express ou Python/FastAPI) para chamadas.
-    * **Serviços de OCR e IA:**
-        * **OCR:** Tesseract.js.
-        * **IA/LLM:** API da OpenAI (GPT-4o) ou Google Gemini para simplificação e Chat Q&A.
-        * **Voz:** Web Speech API (Text-to-Speech e Speech-to-Text).
-    * **Banco de Dados:** PostgreSQL para gestão de contas e histórico de análises.
-
-    ---
-
-    ### 3. 🔄 Versionamento e Práticas de Código
-    * **Controle de Versão:** Git e GitHub.
-    * **Estratégia de Branches:** GitFlow simplificado.
-        * `main`: Código estável e pronto para produção.
-        * `math`, `andre` e `naoto` para alterações individuais e checagem antes de dar o commit.
-    * **Revisão de Código:** Criação de Pull Requests (PRs) obrigatórios antes de integrar código à branch principal.
-
-    ---
-
-    ### 4. 🚀 Publicação e Deploy (CI/CD)
-    * **Hospedagem do Frontend:** 
-    * **Hospedagem do Backend:** 
-    * **Segurança na Publicação:** 
-
-    ---
-
-    ### 5. 🧪 Estratégia de Garantia de Qualidade (QA)
-    * **Testes de OCR:** Validação do percentual de acerto do texto extraído com fotos em diferentes iluminações.
-    * **Testes de Usabilidade:** Validação das interfaces por usuários com o perfil das personas para checar facilidade de navegação e clareza do áudio.
-    * **Tratamento de Erros:** Exibição de mensagens orientativas e amigáveis ao usuário caso ocorram falhas de conexão ou leitura.
+## 🛠️ Protótipos e provas de conceitos
 
 
-    ## 📂 Pasta de desenvolvimento
+## 💡 Plano de iteração
+1. Upload de `Contrato`
+2. Validação da captura ()
+3. Extração de texto (OCR)
+4. Exibição do conteúdo extraído, validando se a captura funciona de forma confiável antes de integrar a camada de IA. // Colocar em bullet points
 
-    ```text
-    /
-    ├── 📁 Concepção/
-    │   ├── DesignThinking.md              # Etapas de empatia, ideação e prototipação
-    │   ├── Requirements.md                # Levantamento de Requisitos (RF, RNF, RU, RC, RD, RS)
-    │   ├── UseCases.uml                   # Modelagem visual dos Casos de Uso
-    │   ├── UseCasesExplicacao.md          # Especificação detalhada dos Casos de Uso
-    │   ├── Visao_e_CasoDeNegocio.md       # Visão, Riscos, Glossário, PDS e Iterações
-    │   └── WireFrame.md                   # Guias de interface e links do Figma
-    │
-    ├── 📁 Jornadas/
-    │   ├── jornada1.md                    # Jornada da Marta da Silva
-    │   ├── jornada2.md                    # Jornada do Gabriel Ouvirstappen
-    │   └── jornada3.md                    # Jornada do Pedrinho Akira
-    │
-    ├── 📁 Modelo_Conceitual/
-    │   ├── Atividade.md                   # Análise GOMS das tarefas
-    │   ├── Proposicoes.md                 # Proposições genéricas e específicas por persona
-    │   └── Questionamentos_Sistematicos.md # Matriz de questionamentos de usabilidade (Q1-Q6)
-    │
-    ├── 📁 Personas/
-    │   ├── persona1.md                    # Perfil da Marta da Silva
-    │   ├── persona2.md                    # Perfil do Gabriel Ouvirstappen
-    │   └── persona3.md                    # Perfil do Pedrinho Akira
-    │
-    └── README.md                          # Visão geral do repositório e guia do projeto
+## 🛠️ Plano de desenvolvimento de software
+### 1. ⚡ Metodologia de Desenvolvimento
+* **Processo:** Metodologia Ágil adaptada (Scrum/Kanban).
+* **Ciclos de Entrega:** Sprints semanais com Dailies para acompanhamento.
+* **Quadro de Tarefas:** Gestão visual das demandas via Trello e Issues do Github.
+
+---
+
+### 2. 💻 Stack Tecnológica Selecionada
+* **Frontend:** Web Mobile-First (React / Next.js).
+* **Backend:** API REST (Node.js/Express ou Python/FastAPI) para chamadas.
+* **Serviços de OCR e IA:**
+    * **OCR:** Tesseract.js.
+    * **IA/LLM:** API da OpenAI (GPT-4o) ou Google Gemini para simplificação e Chat Q&A.
+    * **Voz:** Web Speech API (Text-to-Speech e Speech-to-Text).
+* **Banco de Dados:** PostgreSQL para gestão de contas e histórico de análises.
+
+---
+
+### 3. 🔄 Versionamento e Práticas de Código
+* **Controle de Versão:** Git e GitHub.
+* **Estratégia de Branches:** GitFlow simplificado.
+    * `main`: Código estável e pronto para produção.
+    * `math`, `andre` e `naoto` para alterações individuais e checagem antes de dar o commit.
+* **Revisão de Código:** Criação de Pull Requests (PRs) obrigatórios antes de integrar código à branch principal.
+
+---
+
+### 4. 🚀 Publicação e Deploy (CI/CD)
+* **Hospedagem do Frontend:** 
+* **Hospedagem do Backend:** 
+* **Segurança na Publicação:** 
+
+---
+
+### 5. 🧪 Estratégia de Garantia de Qualidade (QA)
+* **Testes de OCR:** Validação do percentual de acerto do texto extraído com fotos em diferentes iluminações.
+* **Testes de Usabilidade:** Validação das interfaces por usuários com o perfil das personas para checar facilidade de navegação e clareza do áudio.
+* **Tratamento de Erros:** Exibição de mensagens orientativas e amigáveis ao usuário caso ocorram falhas de conexão ou leitura.
+
+
+## 📂 Pasta de desenvolvimento
+
+```text
+/
+├── 📁 Concepção/
+│   ├── DesignThinking.md              # Etapas de empatia, ideação e prototipação
+│   ├── Requirements.md                # Levantamento de Requisitos (RF, RNF, RU, RC, RD, RS)
+│   ├── UseCases.uml                   # Modelagem visual dos Casos de Uso
+│   ├── UseCasesExplicacao.md          # Especificação detalhada dos Casos de Uso
+│   ├── Visao_e_CasoDeNegocio.md       # Visão, Riscos, Glossário, PDS e Iterações
+│   └── WireFrame.md                   # Guias de interface e links do Figma
+│
+├── 📁 Jornadas/
+│   ├── jornada1.md                    # Jornada da Marta da Silva
+│   ├── jornada2.md                    # Jornada do Gabriel Ouvirstappen
+│   └── jornada3.md                    # Jornada do Pedrinho Akira
+│
+├── 📁 Modelo_Conceitual/
+│   ├── Atividade.md                   # Análise GOMS das tarefas
+│   ├── Proposicoes.md                 # Proposições genéricas e específicas por persona
+│   └── Questionamentos_Sistematicos.md # Matriz de questionamentos de usabilidade (Q1-Q6)
+│
+├── 📁 Personas/
+│   ├── persona1.md                    # Perfil da Marta da Silva
+│   ├── persona2.md                    # Perfil do Gabriel Ouvirstappen
+│   └── persona3.md                    # Perfil do Pedrinho Akira
+│
+└── README.md                          # Visão geral do repositório e guia do projeto
