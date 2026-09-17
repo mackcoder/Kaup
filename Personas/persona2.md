@@ -4,8 +4,6 @@
     <img src="https://github.com/mackcoder/LAB_ENG_SOFTWARE-MAN-/blob/main/Personas/Personas_imagens/persona-2.png" width="300">
 </p>
 
-<img src="image.png" alt="alt text" width="400">
-
 ## Apelido e Desenho
   - Estudante
   - Piloto de corridas ilegais
