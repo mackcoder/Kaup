@@ -1,5 +1,9 @@
 # Nome: Marta da Silva
 
+<p align="center">
+    <img src="https://github.com/mackcoder/LAB_ENG_SOFTWARE-MAN-/blob/main/Personas/Personas_imagens/persona-1.png" width="300">
+</p>
+
 ## Apelido e Desenho
   - Mãe solteira de duas meninas
   - Faxineira e trabalhadora informal
