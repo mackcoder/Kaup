@@ -1,1 +1,15 @@
+version: '3.8'
 
+services: 
+  #Banco de dados
+  postgres:
+  
+  #Backend
+  backend:
+    build: ./backend/src
+
+  #Frontend
+  frontend:
+    build: ./frontend/src
+
+volumes:
