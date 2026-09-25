@@ -1,15 +1,40 @@
 version: '3.8'
 
-services: 
-  #Banco de dados
+services:
   postgres:
-  
-  #Backend
-  backend:
-    build: ./backend/src
+    image: postgres:15-alpine
+    container_name: app_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: usuario_app
+      POSTGRES_PASSWORD: senha_segura
+      POSTGRES_DB: gestao_contratos
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/config/init.sql:/docker-entrypoint-initdb.d/init.sql
 
-  #Frontend
+  backend:
+    build: ./backend
+    container_name: app_backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://usuario_app:senha_segura@postgres:5432/gestao_contratos
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    depends_on:
+      - postgres
+
   frontend:
-    build: ./frontend/src
+    build: ./frontend
+    container_name: app_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
 
 volumes:
+  postgres_data:
