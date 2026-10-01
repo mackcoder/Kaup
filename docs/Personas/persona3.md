@@ -1,7 +1,7 @@
 # Nome: Pedrinho Akira
 
 <p align="center">
-    <img src="https://github.com/mackcoder/LAB_ENG_SOFTWARE-MAN-/blob/main/Personas/Personas_imagens/persona-3.png" width="300">
+    <img src="Personas_imagens/persona-3.png" width="300">
 </p>
 
 ## Apelido e Desenho
