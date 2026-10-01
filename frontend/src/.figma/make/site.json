@@ -1,10 +1,12 @@
 {
-  "description": "A mobile app featuring a clean white interface that seamlessly integrates user code to deliver personalized functionality and enhanced user experience.",
+  "title": "Kaup | Entenda seus contratos",
+  "description": "Analise contratos com clareza. Veja valores, prazos, juros e pontos de atenção em uma linguagem simples.",
+  "language": "pt-BR",
   "robots": {
     "index": false
   },
   "accessibility": {
-    "addBypassLinks": false,
+    "addBypassLinks": true,
     "ignoreReducedMotion": false
   }
 }
