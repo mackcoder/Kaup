@@ -10,7 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/analise")
 public class AnaliseController {
 
+    @SuppressWarnings("unused")
     private final OcrService ocrService;
+    @SuppressWarnings("unused")
     private final GeminiService geminiService;
 
     public AnaliseController(OcrService ocrService, GeminiService geminiService) {
