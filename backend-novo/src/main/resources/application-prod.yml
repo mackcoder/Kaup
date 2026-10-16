@@ -1,0 +1,7 @@
+# JDBC credentials must be provided through SPRING_DATASOURCE_*.
+# HTTPS termination and deployment policy are outside phase 1.
+server:
+  servlet:
+    session:
+      cookie:
+        secure: true
