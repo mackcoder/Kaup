@@ -3,7 +3,7 @@
 # 📚 *Contratos Nível AI*
 
 > **Disciplina:** Laboratório de Engenharia de Software  
-> **Docente:** Calebe Bianchini  
+> **Docente:** Gustavo Moreira Calixto
 > **Metodologia:** Scrum / Agile
 
 ---
@@ -56,6 +56,67 @@ Com o desenvolvimento do projeto, esperamos **colocar em prática os conheciment
 
 ---
 
+## 5. 🗂️ Estrutura e versões do frontend
+
+O repositório Kaup mantém o protótipo original e a aplicação refatorada em pastas independentes:
+
+| Caminho | Responsabilidade |
+|---|---|
+| `frontend/src/` | Frontend original React + TypeScript + Vite, usado como referência visual e funcional |
+| `frontend-novo/` | Frontend refatorado, com as cinco telas preservadas, rotas reais, componentes reutilizáveis, testes e adapters mock/API |
+| `backend/` | Backend Java 17 + Spring Boot, com dependências JPA/PostgreSQL e Tess4J |
+| `docs/` | Requisitos, concepção, documentação acadêmica e apresentações |
+| `Kaup.pdf` | Apresentação do projeto |
+
+A aplicação refatorada mantém Home, categorias, listagem de documentos, chat por documento e perfil. Corrige a seleção de arquivos e os contadores, inclui prévia de imagem e confirmação de envio, e separa a interface dos dados e do acesso HTTP. O frontend original continua disponível na sua própria pasta.
+
+Documentação da refatoração: [execução e arquitetura](frontend-novo/README.md), [relatório de migração](frontend-novo/MIGRATION_NOTES.md), [especificação](frontend-novo/SPECS.md) e [contrato proposto da API](frontend-novo/API_CONTRACT_RASCUNHO.md).
+
+## 6. ▶️ Como executar
+
+Use **Node.js 22.12+** e npm. Cada bloco abaixo parte da raiz do repositório e executa uma versão independente.
+
+### Frontend refatorado
+
+```bash
+cd frontend-novo
+npm install
+npm run dev
+```
+
+Abra **http://localhost:5174**. O modo padrão é `mock` e funciona integralmente sem backend. Os documentos e valores demonstrativos são fictícios. Uploads, mensagens e preferências permanecem somente na memória da sessão e são descartados ao recarregar a página. Arquivos enviados em mock não passam por OCR nem por análise real; áudio, ajuda, exclusão de conta e logout continuam demonstrativos.
+
+### Frontend original
+
+```bash
+cd frontend/src
+npm install
+npm run dev
+```
+
+Abra **http://localhost:8443**. Consulte também o [guia do frontend original](frontend/como_rodar.md) para instruções de execução e publicação. As duas versões podem rodar ao mesmo tempo, nas respectivas portas.
+
+## 7. 🧪 Qualidade e integração
+
+Dentro de `frontend-novo/`:
+
+```bash
+npm run lint
+npm run test
+npm run build
+npm run preview
+```
+
+O build verifica TypeScript antes de gerar `dist/`. A refatoração inclui 24 testes de domínio, serviços e fluxos React, além de scripts de navegador e registros de comparação visual em 390×844, 430×932 e 1280×800. Os comandos e limites dessas verificações estão no [README da aplicação refatorada](frontend-novo/README.md#verificação-e-comparações).
+
+Para preparar a conexão HTTP com o Spring Boot, copie `frontend-novo/.env.example` para `frontend-novo/.env`, defina `VITE_DATA_SOURCE=api` e reinicie o servidor de desenvolvimento. Com `VITE_API_BASE_URL` vazia, o proxy Vite encaminha `/api` para `http://localhost:8080`; uma origem explícita pode ser configurada nessa variável. Em produção, configure o encaminhamento de `/api` ou a origem do backend.
+
+**Estado atual do backend na `main`:** somente `GET /api/analise/health` está implementado. Upload, documentos, análise OCR/IA, histórico/chat, perfil e autenticação ainda dependem da implementação e aprovação dos contratos no Spring Boot. Falhas do modo `api` são exibidas e não retornam dados mock automaticamente. A integração HTTP interceptada nos testes não comprova a disponibilidade desses endpoints no backend real.
+
+PostgreSQL, OCR e Gemini devem ser acessados exclusivamente pelo backend. Não coloque chaves ou segredos em variáveis `VITE_*`, pois elas são expostas no navegador. O [rascunho da API](frontend-novo/API_CONTRACT_RASCUNHO.md) reúne as pendências de autenticação, autorização, armazenamento, formatos/limites de arquivos, CORS e privacidade.
+
+---
+
 ## ✉️ Contatos
 
 Fique à vontade para entrar em contato com os membros da equipe para dúvidas, sugestões ou colaborações no projeto:
@@ -75,7 +136,7 @@ Fique à vontade para entrar em contato com os membros da equipe para dúvidas, 
   * 💼 [LinkedIn](https://www.linkedin.com/in/naoto-ushizaki-30b94a172/)
   * 🐙 [GitHub](https://github.com/mackcoder)
 
-## 5. 📚 Referências
+## 8. 📚 Referências
 
 * INSTITUTO PAULO MONTENEGRO. **INAF Brasil 2024: alfabetismo do analógico ao digital.** São Paulo, 2024. Disponível em: https://alfabetismofuncional.org.br/2024_Relatorio_Inaf_DIGITAL.pdf. Acesso em: 19 ago. 2026.
 
