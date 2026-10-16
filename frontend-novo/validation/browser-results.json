@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-16",
+  "viewports": [
+    {
+      "size": "390x844",
+      "geometry": {
+        "width": 390,
+        "viewport": 390,
+        "font": "Nunito, sans-serif"
+      }
+    },
+    {
+      "size": "430x932",
+      "geometry": {
+        "width": 430,
+        "viewport": 430,
+        "font": "Nunito, sans-serif"
+      }
+    },
+    {
+      "size": "1280x800",
+      "geometry": {
+        "width": 1280,
+        "viewport": 1280,
+        "font": "Nunito, sans-serif"
+      }
+    }
+  ],
+  "flows": [
+    "upload PDF real → confirmação → chat sem finanças fictícias → pergunta/resposta ilustrativa",
+    "anexo de imagem → preview → contexto do documento atualizado",
+    "contadores 25→26; busca na URL; reload limpa apenas dados de sessão",
+    "edição de perfil, fonte, exclusão e logout demonstrativos"
+  ],
+  "errors": [],
+  "status": "passed"
+}

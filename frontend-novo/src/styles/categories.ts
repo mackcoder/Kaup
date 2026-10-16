@@ -1,0 +1,48 @@
+import type { DocumentCategory } from "../types/domain";
+export const CATEGORY_STYLES: DocumentCategory[] = [
+  {
+    key: "Carros",
+    emoji: "🚗",
+    label: "Carros",
+    color: "#b45309",
+    colorLight: "#d97706",
+    colorBg: "#fef3c7",
+    gradient: ["#92400e", "#d97706"],
+  },
+  {
+    key: "Casa",
+    emoji: "🏠",
+    label: "Casa",
+    color: "#0369a1",
+    colorLight: "#0284c7",
+    colorBg: "#e0f2fe",
+    gradient: ["#0c4a6e", "#0284c7"],
+  },
+  {
+    key: "Trabalho",
+    emoji: "💼",
+    label: "Trabalho",
+    color: "#5b21b6",
+    colorLight: "#7c3aed",
+    colorBg: "#ede9fe",
+    gradient: ["#3b0764", "#7c3aed"],
+  },
+  {
+    key: "Banco",
+    emoji: "🏦",
+    label: "Banco",
+    color: "#065f46",
+    colorLight: "#059669",
+    colorBg: "#d1fae5",
+    gradient: ["#022c22", "#059669"],
+  },
+  {
+    key: "Outros",
+    emoji: "📄",
+    label: "Outros",
+    color: "#334155",
+    colorLight: "#475569",
+    colorBg: "#f1f5f9",
+    gradient: ["#0f172a", "#475569"],
+  },
+];
