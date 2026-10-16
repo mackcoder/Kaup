@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -29,6 +31,18 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         safeHeaders.setContentType(MediaType.APPLICATION_JSON);
         return new ResponseEntity<>(ApiError.forStatus(status, RequestIdFilter.requestId(servletRequest)),
                 safeHeaders, status);
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiError> unauthenticated(HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).contentType(MediaType.APPLICATION_JSON)
+                .body(ApiError.forStatus(HttpStatus.UNAUTHORIZED, RequestIdFilter.requestId(request)));
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> forbidden(HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).contentType(MediaType.APPLICATION_JSON)
+                .body(ApiError.forStatus(HttpStatus.FORBIDDEN, RequestIdFilter.requestId(request)));
     }
 
     @ExceptionHandler(Exception.class)

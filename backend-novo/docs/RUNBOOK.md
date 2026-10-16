@@ -1,4 +1,4 @@
-# Operação e testes — fase 1
+# Operação e testes — fases 1–2
 
 ## Ambiente de desenvolvimento
 
@@ -17,7 +17,7 @@ curl -i http://localhost:8080/api/analise/health
 curl -i http://localhost:8080/api/perfil
 ```
 
-Resultados esperados: health 200/texto; perfil 401 JSON, sem endpoint de login ainda. POST sem CSRF retorna 403. Endpoints de documentos/perfil/chat não estão implementados; o filtro protege esses caminhos desde a base. Nada retorna dados fictícios.
+Resultados esperados: health 200/texto; perfil 401 sem login e 404 autenticado (ainda não implementado). POST sem CSRF retorna 403. Auth já está implementada; documentos/perfil/chat continuam pendentes. Nenhum dado fictício é retornado pela API.
 
 Portas no loopback: 8080 (API_PORT) e 55432 (DB_PORT); ajuste .env se ocupadas. Compose usa projeto kaup-backend-novo, rede e volume próprios, sem usar app_postgres em 5432. Não imprimir `docker compose config` completo em relatórios, pois pode incluir a senha; usar --quiet.
 
@@ -30,7 +30,47 @@ curl -i http://localhost:8080/api/analise/health
 docker compose down
 ```
 
-V1 deve aparecer uma vez, users vazio na instalação limpa. `down` preserva dados; não apagar volume para contornar migração com checksum inválido. Corrigir via nova migration, nunca modificar V1 já aplicada em banco compartilhado.
+V1 e V2 devem aparecer uma vez cada. Users fica vazio até um cadastro explícito; migrations não criam contas. `down` preserva dados; não apagar volume para contornar migração com checksum inválido. Corrigir via nova migration, nunca modificar V1 já aplicada em banco compartilhado.
+
+## Autenticação por HTTP
+
+Use somente dados sintéticos no desenvolvimento. O fluxo abaixo parte de `backend-novo/`, exige
+Python 3 apenas para ler JSON e guarda cookies/tokens em diretório temporário privado. Nenhuma senha
+vai no argumento do curl ou no histórico. Valores de token/cookie não devem ser publicados em logs.
+
+```bash
+umask 077
+KAUP_AUTH_TMP=$(mktemp -d)
+export KAUP_AUTH_TMP
+trap 'rm -rf "$KAUP_AUTH_TMP"' EXIT
+curl -fsS -c "$KAUP_AUTH_TMP/cookies" http://localhost:8080/api/auth/csrf > "$KAUP_AUTH_TMP/csrf.json"
+KAUP_CSRF=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["token"])' "$KAUP_AUTH_TMP/csrf.json")
+read -r -p 'Email de teste: ' KAUP_EMAIL
+read -r -s -p 'Senha de teste (12–72 caracteres, até 72 bytes UTF-8): ' KAUP_PASSWORD
+export KAUP_EMAIL KAUP_PASSWORD
+python3 - <<'AUTH_JSON'
+import json, os
+from pathlib import Path
+path = Path(os.environ['KAUP_AUTH_TMP'])
+fields = dict(email=os.environ['KAUP_EMAIL'], password=os.environ['KAUP_PASSWORD'])
+(path / 'register.json').write_text(json.dumps(dict(name='Pessoa de teste', **fields)))
+(path / 'login.json').write_text(json.dumps(fields))
+AUTH_JSON
+curl -fsS -b "$KAUP_AUTH_TMP/cookies" -c "$KAUP_AUTH_TMP/cookies" -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $KAUP_CSRF" --data-binary @"$KAUP_AUTH_TMP/register.json" http://localhost:8080/api/auth/register
+curl -fsS -b "$KAUP_AUTH_TMP/cookies" -c "$KAUP_AUTH_TMP/cookies" -H 'Content-Type: application/json' -H "X-CSRF-TOKEN: $KAUP_CSRF" --data-binary @"$KAUP_AUTH_TMP/login.json" http://localhost:8080/api/auth/login
+curl -fsS -b "$KAUP_AUTH_TMP/cookies" http://localhost:8080/api/auth/me
+# O login rotacionou sessão e CSRF: recarregue antes de logout/escritas.
+curl -fsS -b "$KAUP_AUTH_TMP/cookies" -c "$KAUP_AUTH_TMP/cookies" http://localhost:8080/api/auth/csrf > "$KAUP_AUTH_TMP/csrf.json"
+KAUP_CSRF=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["token"])' "$KAUP_AUTH_TMP/csrf.json")
+curl -i -b "$KAUP_AUTH_TMP/cookies" -c "$KAUP_AUTH_TMP/cookies" -H "X-CSRF-TOKEN: $KAUP_CSRF" -X POST http://localhost:8080/api/auth/logout
+unset KAUP_EMAIL KAUP_PASSWORD KAUP_CSRF
+```
+
+Cadastro: 201; login/me: 200; logout: 204. Repetir cadastro com o mesmo
+email dá 409. Cookie/CSRF expirado ou antigo não deve autenticar/autorizar escritas. Limite de auth:
+20 tentativas/60s por IP direto, compartilhado entre login/cadastro; excesso 429. Em HTTP público,
+use TLS e profile prod; Secure deve permanecer habilitado. Sessões sobrevivem ao reinício da API;
+logout e expiração as removem/inutilizam. O cleanup JDBC executa a cada minuto.
 
 ## Maven com Java 17 local
 
@@ -78,7 +118,7 @@ O caminho absoluto igual no host/container permite mounts do Testcontainers. --n
 | Binding local | SERVER_ADDRESS=127.0.0.1, SERVER_PORT=8080 | Mesmos defaults; container injeta 0.0.0.0 |
 | Cookie | HttpOnly, SameSite=Lax, Secure=false no HTTP local | Secure=true |
 
-Outras env: DB_POOL_SIZE=5, MAX_UPLOAD_SIZE=10MB, MAX_REQUEST_SIZE=11MB. São limites de transporte, não validação de uploads implementada. Compose fixa dev para esta demo; não é configuração de produção. IA/OCR/storage ainda não possuem variáveis ativas/adapters. Sem banco válido, startup falha: não há H2 ou fallback.
+Outras env: DB_POOL_SIZE=5, MAX_UPLOAD_SIZE=10MB, MAX_REQUEST_SIZE=11MB, AUTH_BCRYPT_STRENGTH=12 (10–14), AUTH_MAX_ATTEMPTS=20, AUTH_ATTEMPT_WINDOW=PT1M e SESSION_TIMEOUT=30m. São limites de transporte, não validação de uploads implementada. Compose fixa dev para esta demo; não é configuração de produção. IA/OCR/storage ainda não possuem variáveis ativas/adapters. Sem banco válido, startup falha: não há H2 ou fallback.
 
 ## Diagnóstico e limites
 
@@ -89,6 +129,6 @@ HTTP sintaticamente inválido pode ser rejeitado pelo parser Tomcat antes dos fi
 a resposta é um 400 genérico do servidor, sem garantia do envelope JSON/requestId. O logger
 Http11Processor permanece em ERROR para não gravar URLs/headers recebidos em diagnósticos de parsing.
 
-Sem frontend alterado: o modo padrão continua mock; modo api só pode testar health nesta fase. Vite já encaminha /api para localhost:8080, mas auth/CSRF e o fluxo real pertencem às fases seguintes. Nenhuma chamada Gemini/OCR realizada. Retenção/consentimento e HTTPS exigem decisão antes de publicação/dados pessoais.
+Sem frontend alterado: o modo padrão continua mock e o cliente api ainda não integra login/CSRF. Vite já encaminha /api para localhost:8080; a adaptação visual/HTTP do cliente fica na fase 8. Auth pode ser testada diretamente por HTTP agora. Nenhuma chamada Gemini/OCR realizada. Retenção/consentimento e HTTPS exigem decisão antes de publicação/dados pessoais.
 
 Resultados efetivamente obtidos, incluindo limitações e falhas corrigidas: [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md).

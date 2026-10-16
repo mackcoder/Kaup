@@ -1,6 +1,6 @@
 # Plano de implementação — Kaup
 
-Inventário em **16/10/2026**, branch `dede_backend`, HEAD `32172a3`. Esta execução autoriza somente descoberta e fase 1. Backend completo permanece pendente.
+Inventário em **16/10/2026**, branch `dede_backend`, HEAD `32172a3`. Estado atual: fases 0 e 1 concluídas; fase 2 autorizada, concluída e validada em 16/10/2026. Backend completo permanece pendente.
 
 ## Inventário factual
 
@@ -22,7 +22,7 @@ Inventário em **16/10/2026**, branch `dede_backend`, HEAD `32172a3`. Esta execu
 |---|---|---|---|
 | 0 | Descoberta | Fontes lidas, divergências e decisões registradas | Concluída |
 | 1 | Base executável | Maven test/verify; Postgres real/Flyway; imagem não-root Java 17; Compose saudável; curl health; erros sanitizados; V1 não reaplicada após reinício | Concluída e verificada |
-| 2 | Auth e isolamento | Cadastro/login/logout/me, sessão JDBC, hash, CSRF, testes 401/403 e A/B, sem editar frontend | Pendente |
+| 2 | Auth e isolamento | Cadastro/login/logout/me, sessão JDBC, hash, CSRF, testes 401/403 e guard A/B; documentos reais ficam na fase 3 | Concluída e verificada |
 | 3 | CRUD/upload | Owner obrigatório, PDF/PNG/JPEG validados, storage privado, 202/DTO, migrations e testes negativos | Pendente |
 | 4 | PDF/OCR e jobs | Extração real, limites/lease, concorrência, recuperação após reinício e falhas persistidas | Pendente |
 | 5 | Gemini/análise | JSON validado, evidências, timeout/429/schema inválido; fake explícito nos testes, live opt-in separado | Pendente |
@@ -111,3 +111,56 @@ Os 13 Markdown iniciais foram movidos para `backend-novo/docs/`, por solicitaç�
 do usuário. O AGENTS.md da raiz contém somente encaminhamento para as instruções completas.
 Atualizados os caminhos relativos, os prompts e a estrutura descrita na documentação.
 Esta alteração é documental; código, configuração, migrations e arquivos de ambiente não mudam.
+
+### Início da fase 2 — autenticação e autorização
+
+Base revisada: dede_backend em 48a0d35, árvore limpa. Planejamento/contrato/segurança e código atual conferidos; fase 1 tem 17 testes e somente health público. Frontend permanece sem contrato de login implementado no cliente e não será editado.
+
+Fatia autorizada: accounts JPA sobre users; nova migration V2 para nome e tabelas Spring Session JDBC, sem alterar V1; POST register/login/logout e GET me/csrf; BCrypt sem truncamento de senha; cookie HttpOnly/SameSite=Lax/Secure em prod; CSRF em toda escrita; rotação da sessão/token no login; falhas genéricas e limite de tentativas. Cadastro não autentica automaticamente.
+
+Isolamento: identidade estável UUID obtida da sessão e verificada contra conta habilitada; guard de proprietário reutilizável. Provas A/B usarão recursos exclusivamente de teste; nenhuma rota/tabela de documentos de produção será antecipada. Na fase 3, consultas e alterações deverão filtrar owner no banco.
+
+Aceite: testes de unidade/HTTP e PostgreSQL real para cadastro duplicado/concorrente, hash, login correto/incorreto, CSRF ausente/inválido/antigo, fixação, cookies, logout/replay/expiração, conta desabilitada, isolamento A/B e limitação de tentativas. Maven clean verify; Compose sobre volume V1 existente com V2 aplicada, smoke HTTP e sessão preservada após reinício; nenhum segredo/hash em respostas/logs ou caminhos protegidos alterados. Resultados serão preenchidos após execução.
+
+### Resultado da fase 2 — 16/10/2026
+
+**Concluída e validada. Nenhum avanço à fase 3.** Contas e sessão reais em PostgreSQL; endpoints
+health + GET auth/csrf/me e POST auth/register/login/logout. Documentos, perfil, arquivos e IA continuam
+pendentes. O guard de proprietário está preparado e validado com recursos exclusivamente de teste;
+não há CRUD/tabela/controller de documentos de produção nesta fase.
+
+| Verificação efetivamente executada | Resultado |
+|---|---|
+| Maven via Docker Java 17, `mvn -B -ntp -Dmaven.repo.local=/tmp/maven/repository test` | Primeira compilação/base: 10 HTTP da fase 1 passaram |
+| Maven via Docker Java 17, `mvn -B -ntp -Dmaven.repo.local=/tmp/maven/repository verify` | Primeira fatia: 41 testes aprovados, sem falhas/ignorados |
+| Maven final, `mvn -B -ntp -Dmaven.repo.local=/tmp/maven/repository clean verify` | BUILD SUCCESS, **42 testes: 26 de unidade/HTTP e 16 IT**, zero falhas/erros/ignorados, 17,575 s |
+| docker compose config --quiet / build api / up -d --wait --wait-timeout 60 | Configuração e imagem válidas; API/Postgres healthy, runtime UID 10001 |
+| SQL no volume existente: flyway_schema_history | V1 preservada; V2 add auth and sessions aplicada uma vez; ambas success=true |
+| Smoke HTTP real com duas contas sintéticas | Cadastro 201 sem auto-login, login/me 200, me anônimo 401, CSRF pré-login 403, documentos autenticados 404 (pendentes), cookie renovado |
+| docker compose restart api / up -d --wait + me/logout | As duas sessões e seus CSRF persistiram; me recuperou o mesmo UUID; logout 204; cookie antigo não autenticou (401) |
+| Smoke de limite de tentativas | 20 logins inválidos = 401, 21º = 429; variar X-Forwarded-For não contornou o limite por IP direto |
+| Container temporário com profile prod, mesmo PostgreSQL | GET csrf 200 e cookie Secure/HttpOnly/SameSite=Lax/path /, host-only; container removido após teste |
+| Sessões JDBC / credenciais | Idle timeout 1800 s; IT verificou principal UUID, credenciais/hash apagados e ausência de senha/hash/email nos atributos serializados |
+| Inspeção de jar, OpenAPI YAML, links e caminhos protegidos | Sem fixtures/.env no jar; 6 paths no OpenAPI; links locais válidos; backend/, frontend/, frontend-novo/, docs/ raiz e compose raiz sem alterações |
+
+No Compose o BCrypt foi configurado com custo 12; duas observações de login foram 584 e 250 ms,
+sem constituir SLA. Testes determinísticos usam custo 10. Contas criadas no smoke foram removidas por
+seus UUIDs exclusivos; users voltou a 0, sem apagar volume ou dados anteriores. Arquivo temporário com
+cookies/senhas foi criado 0600, não exibido e removido. Logs conferidos sem email/senha dessas contas.
+
+Problemas tratados: o handler genérico anterior mapearia AuthenticationException para 500, agora
+há 401/403 controlados; limite de 72 bytes do BCrypt é validado sem truncar Unicode; mínimo de senha
+conta code points em vez de aceitar 6 emojis como 12 caracteres; cadastro concorrente evita exception
+SQL que poderia registrar email; testes agora fecham contexto antes do descarte do Postgres, evitando
+cleanup de sessões sobre conexões já fechadas. Todas as verificações Maven executadas passaram; os
+avisos de conexão fechada da primeira rodada desapareceram na execução final.
+
+Evidências: target/surefire-reports, target/failsafe-reports, /tmp/kaup-phase2-unit.log,
+/tmp/kaup-phase2-verify.log e /tmp/kaup-phase2-docker-build.log. Relatórios/artefatos seguem ignorados.
+Não houve commit/push nesta execução. API e banco de desenvolvimento continuam ativos no loopback.
+
+Para iniciar a fase 3: aplicar o prompt Documentos e upload de PROMPTS_FASES.md. Usar o UUID da sessão
+(CurrentUser), jamais ownerId do cliente; queries devem filtrar owner; implementar migration V3, validação
+real de PDF/PNG/JPEG, FileStorage privado, CRUD/status/202 e testes reais A/B. Reutilizar auth/CSRF existentes.
+Documentos/análise/chat/perfil, integração de login no frontend, recuperação de senha, verificação de email,
+proteção distribuída e revisão de deploy/privacidade permanecem pendentes. Sem chave Gemini necessária.

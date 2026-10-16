@@ -1,5 +1,26 @@
 # SECURITY.md — Segurança, privacidade e IA responsável
 
+## Estado implementado — fase 2
+
+AuthService/DaoAuthenticationProvider autenticam contas PostgreSQL. BCrypt padrão custo 12 (env entre
+10 e 14), salt individual, validação de comprimento Unicode e limite de 72 bytes UTF-8 sem truncamento.
+Nome/email são DTOs; nenhum hash/senha é retornado. O principal persistido contém UUID/role, com
+credenciais apagadas pelo ProviderManager, não email/hash. O cadastro é atômico por email normalizado.
+
+Sessão Spring Session JDBC, criada por Flyway V2; idle timeout 30 minutos. Cookie KAUPSESSION host-only,
+path /, HttpOnly, SameSite=Lax, Secure fora de dev. JSON CSRF mascarado em /api/auth/csrf e header
+X-CSRF-TOKEN em toda escrita; login troca ID e limpa token antigo; logout invalida contexto/sessão/token
+e expira cookie. Token/cookie antigos são testados contra replay. Sem Basic, formulário, JWT ou bypass.
+
+CurrentUser verifica UUID da sessão e conta habilitada no banco. OwnerAuthorization recebe ownerId
+obtido do recurso persistido e esconde outro proprietário com 404. O guard está testado com contas e
+recursos exclusivos de teste; documentos reais/queries por owner ainda serão implementados na fase 3.
+
+Cadastro/login compartilham limite local de 20 tentativas/60s por IP direto, até 4096 origens na memória;
+excesso 429. Forwarded headers são ignorados por padrão. O contador reinicia com o processo, não é
+proteção distribuída. Proxy/rate limiting público, verificação de email e recuperação de senha não
+estão implementados. Dados reais/deploy público continuam exigindo a revisão de privacidade prevista.
+
 ## 1. Dados protegidos
 
 Documentos jurídicos/financeiros podem incluir nome, CPF/RG, renda, endereço, assinaturas, contas e obrigações privadas. Perguntas no chat e texto OCR podem reproduzir esses dados. Nunca usar contratos reais de colegas/clientes em fixtures públicas ou enviar para serviço externo sem autorização apropriada.
@@ -10,7 +31,7 @@ Documentos jurídicos/financeiros podem incluir nome, CPF/RG, renda, endereço, 
 - Recomendação padrão para SPA servida sob mesma origem/proxy: sessão HttpOnly, SameSite e `Secure` em HTTPS; CSRF efetivo para operações de escrita, inclusive upload/logout. Se escolher OAuth/JWT, documentar rotação, revogação, armazenamento e superfície XSS. Não colocar token sensível em `localStorage` por comodidade.
 - O `frontend-novo/` inicialmente não possui tela de login integrada; conectar a UI na fase de integração. Não desabilitar autenticação para "fazer o fluxo funcionar" em ambiente público.
 - Todo recurso privado deve verificar `ownerId` do documento/perfil. Testar explicitamente A→B em GET, POST chat, anexos e DELETE. Preferir 404 uniforme para evitar enumeração quando adequado.
-- Cookies de sessão e endpoint `/api/auth/csrf` são **proposta**: concretizar e testar no contrato antes de alterar cliente.
+- Cookies de sessão e `/api/auth/csrf` estão implementados conforme API_CONTRACT.md; o cliente será adaptado na fase 8.
 
 ## 3. Upload seguro
 
@@ -45,9 +66,9 @@ Documentos jurídicos/financeiros podem incluir nome, CPF/RG, renda, endereço, 
 
 ## 7. Checklist de aceite
 
-- [ ] Usuário não autenticado não consulta documentos/perfil/chat privados.
-- [ ] Usuário A não consegue ler/apagar arquivo, análise ou histórico de B.
-- [ ] CSRF/sessão/cookies verificados em integração.
+- [x] Rotas privadas exigem autenticação; CRUD de documentos/perfil/chat continua pendente.
+- [ ] Isolamento de documentos/análise/chat reais A/B (guard preparado e testado; recursos da fase 3 ainda ausentes).
+- [x] CSRF/sessão/cookies verificados em integração (incluindo expiração, logout e replay).
 - [ ] Uploads inválidos/imensos são rejeitados sem execução.
 - [ ] Segredos não estão em arquivos versionados nem aparecem em logs.
 - [ ] Falha do Gemini não retorna texto inventado.

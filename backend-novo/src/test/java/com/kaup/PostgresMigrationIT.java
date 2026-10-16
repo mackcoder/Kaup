@@ -23,6 +23,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @ExtendWith(OutputCaptureExtension.class)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class PostgresMigrationIT {
@@ -50,12 +52,12 @@ class PostgresMigrationIT {
 
     @Test
     void migratesFreshPostgresAndDoesNotReapplyMigration() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
         assertThat(flyway.info().pending()).isEmpty();
         flyway.validate();
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class))
-                .isEqualTo(1);
+                .isEqualTo(2);
     }
 
     @Test
@@ -77,8 +79,8 @@ class PostgresMigrationIT {
     void rejectsUnnormalizedEmailAndBlankHash() {
         assertThatThrownBy(() -> insert(UUID.randomUUID(), " Uppercase@example.test "))
                 .isInstanceOf(DataIntegrityViolationException.class);
-        assertThatThrownBy(() -> jdbc.update("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)",
-                UUID.randomUUID(), "blank@example.test", " "))
+        assertThatThrownBy(() -> jdbc.update("INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)",
+                UUID.randomUUID(), "blank@example.test", " ", "Teste"))
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
 
@@ -131,6 +133,6 @@ class PostgresMigrationIT {
 
     private void insert(UUID id, String email) {
         // Synthetic marker, not a usable password hash or a seeded account.
-        jdbc.update("INSERT INTO users (id, email, password_hash) VALUES (?, ?, ?)", id, email, "test-only-marker");
+        jdbc.update("INSERT INTO users (id, email, password_hash, name) VALUES (?, ?, ?, ?)", id, email, "test-only-marker", "Teste");
     }
 }

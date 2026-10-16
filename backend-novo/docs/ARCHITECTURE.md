@@ -1,6 +1,15 @@
 # ARCHITECTURE.md — Arquitetura proposta para o novo backend
 
-## Recorte implementado em 16/10/2026 (fase 1)
+## Recorte implementado — fase 2
+
+`auth` contém conta/repository JPA, DTOs, cadastro/identificação, serviço de login e limiter local.
+`security` contém configuração de sessão/CSRF e CurrentUser/OwnerAuthorization. Controller valida HTTP;
+AuthSessionService usa AuthenticationManager, estratégia de sessão e persistência explícita do contexto.
+Spring Session JDBC cuida dos cookies/expiração/serialização; Flyway V2 cria as tabelas. Sem login via
+filtro JSON próprio, JWT, perfis fictícios ou repositório de documentos antecipado. Os limites de auth
+não fazem chamadas OCR/IA. O contrato novo está em API_CONTRACT.md e openapi.yaml.
+
+## Histórico do recorte da fase 1
 
 Existem apenas `com.kaup.KaupApplication`, `analysis.HealthController`, `security.SecurityConfig`,
 `common.web.RequestIdFilter` e `common.error` (DTO, advice e fallback servlet). Health não recebe services

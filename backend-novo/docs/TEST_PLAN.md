@@ -1,6 +1,18 @@
 # TEST_PLAN.md — Estratégia de validação do backend Kaup
 
-## Recorte da fase 1
+## Recorte da fase 2
+
+Resultado comprovado: **42 testes aprovados** no clean verify (26 unidade/HTTP + 16 integração), sem falhas ou ignorados. Compose, reinício com sessão, cookies prod e limite real 429 também verificados; evidências em IMPLEMENTATION_PLAN.md.
+
+Unitários: validação UTF-8/Unicode e não exposição da senha, BCrypt/credenciais apagadas, cadastro
+atômico, limites concorrentes, cookies Secure/HttpOnly/SameSite e guard de owner/conta habilitada.
+AuthHttpTest cobre JSON/validação, CSRF, 401/403/415/429 e cache de token. AuthFlowIT usa PostgreSQL
+real e HTTP com cookies: cadastro sem auto-login, concorrência/normalização, hash, rotação de sessão,
+CSRF antigo/cruzado, reautenticação, logout/replay/expiração, conta desabilitada e isolamento A/B.
+O recurso/table/controller de ownership existe somente nos testes, não na aplicação ou migrations.
+O build não contém essas fixtures. Testes usam custo BCrypt 10; Compose usa o default 12.
+
+## Histórico do recorte da fase 1
 
 `HttpContractTest` usa MockMvc, CSRF e principal sintético apenas nos testes para cobrir health,
 401/403, IDs de correlação, 404/405, validação/JSON inválido, 500 e fallback servlet. Rotas `/test/*`

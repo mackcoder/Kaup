@@ -1,6 +1,7 @@
 package com.kaup.security;
 
 import java.io.IOException;
+import java.util.List;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.DispatcherType;
@@ -14,6 +15,14 @@ import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
+import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
+import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 
 import com.kaup.common.error.ApiError;
@@ -22,6 +31,22 @@ import com.kaup.common.web.RequestIdFilter;
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
     @Bean
+    SecurityContextRepository securityContextRepository() {
+        var repository = new HttpSessionSecurityContextRepository();
+        repository.setDisableUrlRewriting(true);
+        return repository;
+    }
+
+    @Bean
+    CsrfTokenRepository csrfTokenRepository() { return new HttpSessionCsrfTokenRepository(); }
+
+    @Bean
+    SessionAuthenticationStrategy sessionAuthenticationStrategy(CsrfTokenRepository csrf) {
+        return new CompositeSessionAuthenticationStrategy(List.of(
+                new ChangeSessionIdAuthenticationStrategy(), new CsrfAuthenticationStrategy(csrf)));
+    }
+
+    @Bean
     WebSecurityCustomizer rejectedRequestHandling(ObjectMapper mapper) {
         // sendError would dispatch the rejected method back through the same firewall.
         return web -> web.requestRejectedHandler((request, response, exception) ->
@@ -29,12 +54,19 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http, ObjectMapper mapper,
+                                           SecurityContextRepository contexts, CsrfTokenRepository csrf) throws Exception {
         return http
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/analise/health").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/auth/csrf").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/register", "/api/auth/login").permitAll()
                         .anyRequest().authenticated())
+                .securityContext(context -> context.securityContextRepository(contexts))
+                .csrf(config -> config.csrfTokenRepository(csrf))
+                .logout(logout -> logout.logoutUrl("/api/auth/logout")
+                        .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)))
                 .requestCache(cache -> cache.requestCache(new NullRequestCache()))
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, exception) ->
@@ -42,7 +74,6 @@ public class SecurityConfig {
                         .accessDeniedHandler((request, response, exception) ->
                                 writeError(mapper, request, response, HttpStatus.FORBIDDEN)))
                 .build();
-        // CSRF remains enabled; no default user, login flow or dev bypass.
     }
 
     private static void writeError(ObjectMapper mapper, HttpServletRequest request,

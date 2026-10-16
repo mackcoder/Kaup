@@ -1,9 +1,12 @@
 # DATABASE_MODEL.md — Modelo relacional proposto (PostgreSQL)
 
-**Fase 1:** somente `V1__create_users.sql` foi implementada: UUID, email normalizado/único,
-password_hash não vazio, enabled e created_at TIMESTAMPTZ. Sem contas de exemplo, perfil, sessão,
-documentos ou jobs ainda. O sequenciamento de V2+ será decidido nas fases próprias; os nomes
-ilustrativos abaixo não devem ser tratados como migrations já existentes.
+**Esquema implementado:** V1 cria users; V2 adiciona name e as tabelas Spring Session JDBC
+(spring_session e spring_session_attributes), com índices de sessão única/expiração/principal e
+FK de atributos ON DELETE CASCADE. Nenhuma conta é criada pela migration. Linhas prévias de users
+recebem nome neutro Usuário; novos cadastros devem informar nome. V1 não foi alterada.
+JPA valida users; Spring Session usa SQL próprio e initialize-schema=never. O principal é o UUID
+da conta; futuras exclusões de conta deverão invalidar sessões por esse índice. Documentos, perfil,
+análises, jobs e chat continuam ausentes. O sequenciamento V3+ seguirá os respectivos marcos.
 
 > Especificação de domínio para orientar entidades JPA e migrações Flyway. Nomes e constraints finais serão confirmados após inventário e registrados em `DECISIONS.md`. Não execute este documento como SQL.
 
@@ -54,11 +57,10 @@ Não colocar binários grandes na base por padrão. Guardar fora de diretórios 
 
 ## 5. Migrations Flyway
 
-- `V1__create_users_and_profiles.sql`: esquema de usuário/perfil/sessão se aplicável.
-- `V2__create_documents.sql`: documentos, constraints e índices.
-- `V3__create_analysis.sql`: extração, análises, facts/points e jobs.
-- `V4__create_chat.sql`: mensagens e índices de ordenação.
-- `V5__create_context_files.sql` (opcional).
+- `V1__create_users.sql`: aplicada na fase 1, imutável.
+- `V2__add_auth_and_sessions.sql`: aplicada na fase 2, nome e sessões JDBC.
+- V3+: documentos/constraints/índices na fase 3; extração/análises/jobs e chat nas fases respectivas.
+- Perfil e anexos terão migrations próprias quando seus contratos forem implementados.
 
 Os nomes são ilustrativos; criar migrations só quando a etapa for implementada. **Nunca editar migration já executada em banco compartilhado**: criar nova migration de alteração. Spring `ddl-auto=validate` após migrar. Testar criação limpa e atualização entre versões.
 

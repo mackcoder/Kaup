@@ -19,11 +19,17 @@ spring:
     enabled: true
     clean-disabled: true
     validate-on-migrate: true
+  session:
+    timeout: ${SESSION_TIMEOUT:30m}
+    jdbc:
+      initialize-schema: never
+      cleanup-cron: "0 * * * * *"
   servlet:
     multipart:
       max-file-size: ${MAX_UPLOAD_SIZE:10MB}
       max-request-size: ${MAX_REQUEST_SIZE:11MB}
 server:
+  forward-headers-strategy: none
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}
   shutdown: graceful
@@ -48,3 +54,7 @@ logging:
   level:
     # Parser diagnostics at INFO/DEBUG include raw request targets and headers.
     org.apache.coyote.http11.Http11Processor: ERROR
+auth:
+  bcrypt-strength: ${AUTH_BCRYPT_STRENGTH:12}
+  max-attempts: ${AUTH_MAX_ATTEMPTS:20}
+  attempt-window: ${AUTH_ATTEMPT_WINDOW:PT1M}

@@ -1,10 +1,8 @@
 # API_CONTRACT.md — Contrato HTTP proposto, orientado ao `frontend-novo/`
 
-**Estado da fase 1 (16/10/2026):** apenas `GET /api/analise/health` implementado, `200 text/plain`
-com `Backend do Kaup está rodando.`. Demais caminhos passam pela proteção Spring Security (401 sem
-autenticação em GET, 403 sem CSRF em escrita), mas ainda não têm controllers de negócio/login.
-Erros já usam `{code,message,requestId}` e header `X-Request-Id`. As tabelas abaixo são contrato-alvo.
-Health é liveness; não comprova conexão atual do banco nem integrações OCR/IA.
+**Estado da fase 2:** implementados health e autenticação descrita na seção 4. Documentos,
+análise, chat e perfil abaixo continuam sendo contrato-alvo das próximas fases. Erros seguem
+`{code,message,requestId}` e header X-Request-Id. Health é liveness, não teste de OCR/IA/DB.
 
 > **Contrato-alvo sujeito a verificação no código atual e aceite da equipe.** Este arquivo espelha as expectativas observadas em `frontend-novo/src/services/api/{endpoints.ts,dto.ts,ApiService.ts}` em 16/10/2026. Alterações no cliente ou backend exigem atualização simultânea. Não é uma relação de endpoints atualmente implementados.
 
@@ -60,7 +58,7 @@ Health é liveness; não comprova conexão atual do banco nem integrações OCR/
 POST /api/documentos HTTP/1.1
 Content-Type: multipart/form-data; boundary=...
 Cookie: sessão=...
-X-XSRF-TOKEN: ...
+X-CSRF-TOKEN: ...
 
 file=<binário PDF/PNG/JPEG>
 categoryId=Casa
@@ -134,19 +132,37 @@ O fluxo mock contém pergunta guiada sobre renda. O modo API **não** deve repro
 
 `fontSize`: `small|medium|large`; `explainLevel`: `simple|normal|complete`; `income`: `less3|3to5|5to7|7to15|more15|prefer_not`; `audio`: boolean. No frontend atual todos esses campos são esperados; se renda não for salva por padrão, represente `prefer_not` e ofereça consentimento antes de atualizar para outra opção.
 
-## 4. Autenticação — extensão necessária (não existe no cliente atual)
+## 4. Autenticação — implementada na fase 2
 
-Definir e implementar endpoints na API, sujeito a integração do frontend:
+| Método | Caminho | Request | Resposta |
+|---|---|---|---|
+| GET | `/api/auth/csrf` | público | 200 `{headerName:"X-CSRF-TOKEN",token:"..."}` + cookie de sessão se necessário |
+| POST | `/api/auth/register` | JSON `{name,email,password}` + CSRF | 201 `{id,name,email}`, sem login automático |
+| POST | `/api/auth/login` | JSON `{email,password}` + CSRF | 200 `{id,name,email}`, sessão autenticada com novo ID |
+| GET | `/api/auth/me` | cookie da sessão autenticada | 200 `{id,name,email}` ou 401 |
+| POST | `/api/auth/logout` | cookie + CSRF | 204 vazio, invalida sessão e expira cookie |
 
-| Método | Caminho proposto | Resultado |
-|---|---|---|
-| POST | `/api/auth/register` | cadastro validado, senha apenas recebida via TLS |
-| POST | `/api/auth/login` | sessão autenticada/cookie seguro |
-| POST | `/api/auth/logout` | invalida sessão |
-| GET | `/api/auth/me` | usuário autenticado ou 401 |
-| GET | `/api/auth/csrf` | cookie/token CSRF se mecanismo exigir |
+Sequência para cliente sob mesma origem/proxy Vite:
 
-Todos devem ter testes e documentação OpenAPI. Na fase de integração, adaptar cliente para credenciais e CSRF. Não criar bypass global de segurança apenas para satisfazer o frontend.
+1. Buscar GET `/api/auth/csrf` e manter o cookie HttpOnly `KAUPSESSION` recebido pelo navegador.
+2. Enviar `token` no header indicado (`X-CSRF-TOKEN`) em todas as operações de escrita, inclusive cadastro/login/logout. O token é mascarado; não decodificar ou buscar cookie XSRF.
+3. Cadastro exige nome não vazio (até 120 caracteres), email válido (até 254, normalizado) e senha de 12–72 caracteres Unicode, no máximo 72 bytes UTF-8; não remover espaços da senha. Nome/email são normalizados pelo servidor.
+4. Login troca o ID da sessão e elimina o CSRF anterior. Buscar GET `/api/auth/csrf` novamente antes da próxima escrita. `/me` é a fonte da identidade autenticada.
+5. Logout somente POST: o cookie antigo deixa de autenticar. Para nova sessão, buscar CSRF novamente. GET logout não altera a sessão. Logout com CSRF anônimo válido também é 204 (idempotente).
+
+Cookie: host-only, path `/`, HttpOnly, SameSite=Lax, Secure em prod/sem profile; dev usa HTTP local.
+Sessão sem remember-me, inatividade padrão de 30 minutos, persistida em PostgreSQL e recuperável após
+reinício. Respostas de auth/CSRF têm Cache-Control no-store. Tokens/senhas nunca vão para localStorage
+nem query string. O servidor não libera CORS entre origens; no frontend futuro usar o proxy já existente.
+
+Erros: 400 payload inválido, 401 credencial inválida/conta ausente/desabilitada ou sessão ausente/expirada,
+403 CSRF ausente/inválido/antigo, 409 email já cadastrado (inclusive concorrência), 415 Content-Type incorreto,
+429 limite de tentativas por IP. Erros de login usam a mesma mensagem para não expor o motivo interno.
+Cadastro duplicado retorna conflito sem ecoar o email. O limiter é local ao processo (20 tentativas/60s),
+compartilhado por cadastro/login, não confia em X-Forwarded-For. Não é limitação distribuída.
+
+[OpenAPI dos endpoints implementados](openapi.yaml). O frontend ainda não possui login/CSRF; sua
+adaptação fica na fase 8. Nenhum contrato TypeScript existente foi alterado nesta fase.
 
 ## 5. Contexto adicional — contrato opcional a negociar
 
