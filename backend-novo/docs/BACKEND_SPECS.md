@@ -2,7 +2,7 @@
 
 ## 1. Contexto
 
-O Kaup ajuda pessoas com dificuldade de entender contratos. Seu frontend React, em `../frontend-novo/`, demonstra documentos por categoria, status, resumo de cláusulas, chatbot por contrato, contexto/anexos e preferências. O backend deve tornar esses recursos reais sem alterar a experiência visual. Comunicação por API REST, nunca acesso direto do React ao banco ou ao provedor de IA.
+O Kaup ajuda pessoas com dificuldade de entender contratos. Seu frontend React, em `../../frontend-novo/`, demonstra documentos por categoria, status, resumo de cláusulas, chatbot por contrato, contexto/anexos e preferências. O backend deve tornar esses recursos reais sem alterar a experiência visual. Comunicação por API REST, nunca acesso direto do React ao banco ou ao provedor de IA.
 
 **Produto-alvo:** MVP acadêmico integrado e demonstrável; não presumir robustez ou conformidade jurídica de um serviço bancário/jurídico em produção.
 

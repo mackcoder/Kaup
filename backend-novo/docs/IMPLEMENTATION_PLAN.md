@@ -104,3 +104,10 @@ Verificação final: `mvn -B -ntp -Dmaven.repo.local=/tmp/maven/repository clean
 Logs desta revisão: /tmp/kaup-review-regression.log, /tmp/kaup-review-methods-regression.log e /tmp/kaup-review-parser-regression.log documentam as falhas reproduzidas; /tmp/kaup-review-verify.log e /tmp/kaup-review-docker-build.log registram as verificações aprovadas. Relatórios Maven atualizados em target/surefire-reports e target/failsafe-reports. Nenhuma mudança em migrations ou diretórios protegidos; nenhum avanço para fase 2.
 
 Smoke da imagem final após `docker compose up -d --wait --wait-timeout 60`: health 200, perfil 401, POST documentos 403 e TRACE/INVALID/caminho bloqueado 400; os erros da aplicação retornaram JSON com requestId igual ao header. Requisição HTTP malformada retornou 400 genérico sem marcador/stacktrace na resposta e sem marcador nos logs. API/Postgres healthy, migration V1 única e 0 usuários preservados; Compose local continua ativo.
+
+### Organização da documentação — 16/10/2026
+
+Os 13 Markdown iniciais foram movidos para `backend-novo/docs/`, por solicitação
+do usuário. O AGENTS.md da raiz contém somente encaminhamento para as instruções completas.
+Atualizados os caminhos relativos, os prompts e a estrutura descrita na documentação.
+Esta alteração é documental; código, configuração, migrations e arquivos de ambiente não mudam.

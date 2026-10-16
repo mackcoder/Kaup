@@ -38,3 +38,12 @@ JSON/requestId. Http11Processor usa nível ERROR para suprimir diagnósticos INF
 URL/headers e stacktrace. A perda desses diagnósticos de entrada é intencional para evitar conteúdo
 sensível nos logs; falhas ERROR do componente continuam habilitadas. Teste com marcador sintético
 comprova a rejeição e a ausência do marcador em resposta e logs.
+
+## ADR-014 — Organização dos documentos iniciais
+
+Por solicitação do usuário, os 13 Markdown iniciais ficam em `backend-novo/docs/`,
+incluindo o conteúdo completo de AGENTS.md e README.md. O AGENTS.md da raiz passa a ser apenas
+um encaminhamento para preservar a descoberta automática das instruções em todo o backend.
+Links entre documentos permanecem na mesma pasta; caminhos relativos às outras áreas do repositório
+e os prompts foram atualizados. Essa organização substitui a localização definida no ADR-013.
+Código, migrations, configuração e arquivos de ambiente continuam na raiz da implementação.

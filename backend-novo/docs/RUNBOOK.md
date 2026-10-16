@@ -2,6 +2,8 @@
 
 ## Ambiente de desenvolvimento
 
+Comece na raiz do repositório. A documentação está em `backend-novo/docs/`; os comandos usam a implementação em `backend-novo/`.
+
 ```bash
 cd backend-novo
 if [ ! -e .env ]; then

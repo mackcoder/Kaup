@@ -4,6 +4,8 @@ Base executável Spring Boot 3.5.16 / Maven / Java 17, PostgreSQL 17.9 e Flyway.
 
 ## Executar localmente
 
+Execute os comandos a partir da raiz do repositório; o código e a configuração continuam em `backend-novo/`.
+
 ```bash
 cd backend-novo
 if [ ! -e .env ]; then
@@ -21,6 +23,8 @@ Para parar, `docker compose down` preserva o volume. Não usar `down -v` em dado
 
 ## Conteúdo
 
+Os caminhos de implementação abaixo são relativos a `backend-novo/`; os links Markdown apontam para os documentos nesta pasta.
+
 - `src/main/java/com/kaup/analysis`: health; `security`: recursos fechados e CSRF; `common/error` e `common/web`: erros e correlação.
 - `src/main/resources/db/migration/V1__create_users.sql`: base vazia de usuários; sem auth/seed. DDL exclusivamente Flyway.
 - `src/test`: contrato HTTP e integração PostgreSQL real. Nenhum mock de OCR/IA no aplicativo.
@@ -28,4 +32,4 @@ Para parar, `docker compose down` preserva o volume. Não usar `down -v` em dado
 - [API_CONTRACT.md](API_CONTRACT.md), [BACKEND_SPECS.md](BACKEND_SPECS.md), [DATABASE_MODEL.md](DATABASE_MODEL.md), [SECURITY.md](SECURITY.md) e [TEST_PLAN.md](TEST_PLAN.md) descrevem o alvo incremental, além do recorte implementado.
 - [PROMPTS_FASES.md](PROMPTS_FASES.md): próximo marco **Fase 2: autenticação e autorização**. [AGENTS.md](AGENTS.md) rege todas as fases.
 
-Os arquivos de especificação originalmente vieram duplicados em backend-novo/backend-novo; foram reposicionados nesta pasta. backend/, frontend/, frontend-novo/, docs/ e compose raiz são preservados.
+Os 13 documentos iniciais foram reunidos em `backend-novo/docs/`. O `backend-novo/AGENTS.md` contém apenas um encaminhamento para as instruções completas daqui.

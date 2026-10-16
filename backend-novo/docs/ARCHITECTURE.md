@@ -35,6 +35,8 @@ backend-novo/ (Spring Boot API)
 
 ```text
 backend-novo/
+├── AGENTS.md              # encaminhamento para as instruções completas
+├── docs/                 # especificações, planos, prompts e instruções
 ├── pom.xml
 ├── Dockerfile
 ├── compose.yaml

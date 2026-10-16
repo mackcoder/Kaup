@@ -1,14 +1,14 @@
 # PROMPTS_FASES.md — Pedidos incrementais para o Codex
 
-> Envie **um prompt por vez**, após verificar a entrega anterior. Em todas as fases o Codex deve ler `AGENTS.md`, atualizar `IMPLEMENTATION_PLAN.md`/`DECISIONS.md`, executar testes e informar limites. Estes prompts não autorizam merge/push.
+> Envie **um prompt por vez**, após verificar a entrega anterior. Em todas as fases o Codex deve ler `backend-novo/docs/AGENTS.md`, atualizar `backend-novo/docs/IMPLEMENTATION_PLAN.md`/`backend-novo/docs/DECISIONS.md`, executar testes e informar limites. Estes prompts não autorizam merge/push.
 
 ## Prompt — Fase 2: autenticação e autorização
 
-> Leia `backend-novo/AGENTS.md`, `SECURITY.md`, `API_CONTRACT.md` e `IMPLEMENTATION_PLAN.md`. Implemente autenticação/sessão real no novo Spring Boot usando Spring Security e PostgreSQL, com cadastro, login, logout, `/api/auth/me`, hash seguro de senha e CSRF efetivo se usar cookie. Crie testes 401/403, sessão, logout e acesso por usuário. Não introduza bypass público nem alterar o frontend nesta etapa. Execute Maven testes/build, documente como testar via HTTP e só marque a fase como concluída após evidências.
+> Leia `backend-novo/docs/AGENTS.md`, `backend-novo/docs/SECURITY.md`, `backend-novo/docs/API_CONTRACT.md` e `backend-novo/docs/IMPLEMENTATION_PLAN.md`. Implemente autenticação/sessão real no novo Spring Boot usando Spring Security e PostgreSQL, com cadastro, login, logout, `/api/auth/me`, hash seguro de senha e CSRF efetivo se usar cookie. Crie testes 401/403, sessão, logout e acesso por usuário. Não introduza bypass público nem alterar o frontend nesta etapa. Execute Maven testes/build, documente como testar via HTTP e só marque a fase como concluída após evidências.
 
 ## Prompt — Fase 3: documentos e upload
 
-> Implemente `POST/GET/DELETE /api/documentos` e `GET /api/documentos/{id}` conforme `API_CONTRACT.md`. Upload multipart deve usar campo `file`, aceitar PDF/PNG/JPEG com validação real, guardar bytes em storage privado, persistir `DocumentDTO`, categoria opcional e estado inicial; aplicar autorização por proprietário, limitar tamanho e devolver erros padronizados. Crie migrations e testes com PostgreSQL, arquivos inválidos e acesso cruzado A/B. Não usar OCR/Gemini simulado como se fosse real.
+> Implemente `POST/GET/DELETE /api/documentos` e `GET /api/documentos/{id}` conforme `backend-novo/docs/API_CONTRACT.md`. Upload multipart deve usar campo `file`, aceitar PDF/PNG/JPEG com validação real, guardar bytes em storage privado, persistir `DocumentDTO`, categoria opcional e estado inicial; aplicar autorização por proprietário, limitar tamanho e devolver erros padronizados. Crie migrations e testes com PostgreSQL, arquivos inválidos e acesso cruzado A/B. Não usar OCR/Gemini simulado como se fosse real.
 
 ## Prompt — Fase 4: PDF/OCR e processamento durável
 
@@ -16,7 +16,7 @@
 
 ## Prompt — Fase 5: Gemini e análise estruturada
 
-> Implemente cliente Gemini server-side com `GEMINI_API_KEY` e modelo configurável, schemas de JSON validados, classificação, resumo, fatos e pontos de atenção com origem/evidência quando possível. Respeite `SECURITY.md` e jamais fabrique dados faltantes. Testes devem simular provider, inclusive timeout/429/schema inválido; smoke ao vivo somente opt-in e com dados sintéticos e credenciais locais. Se o provider não puder ser chamado, informe 'integração implementada mas não validada ao vivo'.
+> Implemente cliente Gemini server-side com `GEMINI_API_KEY` e modelo configurável, schemas de JSON validados, classificação, resumo, fatos e pontos de atenção com origem/evidência quando possível. Respeite `backend-novo/docs/SECURITY.md` e jamais fabrique dados faltantes. Testes devem simular provider, inclusive timeout/429/schema inválido; smoke ao vivo somente opt-in e com dados sintéticos e credenciais locais. Se o provider não puder ser chamado, informe 'integração implementada mas não validada ao vivo'.
 
 ## Prompt — Fase 6: chat contextual e histórico
 
