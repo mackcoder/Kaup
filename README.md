@@ -3,7 +3,7 @@
 # 📚 *Contratos Nível AI*
 
 > **Disciplina:** Laboratório de Engenharia de Software  
-> **Docente:** Calebe Bianchini  
+> **Docente:** Gustavo Moreira Calixto 
 > **Metodologia:** Scrum / Agile
 
 ---
