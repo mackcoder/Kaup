@@ -64,14 +64,19 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
     error,
     sendError,
     isTyping,
-    incomeSent,
+    stage,
+    incomeSelected,
+    selectIncome,
+    sendIncome,
+    inputText,
+    setInputText,
+    canSendText,
+    incomeLocked,
     send,
     retry,
     retrySend,
     refreshContext,
   } = useChat(doc);
-  const [incomeSelected, setIncomeSelected] = useState<string | null>(null),
-    [inputText, setInputText] = useState("");
   const [showContext, setShowContext] = useState(false),
     [showPlus, setShowPlus] = useState(false),
     [attachment, setAttachment] = useState<"photo" | "file" | "context" | null>(
@@ -92,11 +97,11 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
     return () => document.removeEventListener("keydown", key);
   }, []);
   function handleSendIncome() {
-    if (incomeSelected) void send(incomeSelected);
+    void sendIncome();
   }
   function handleSendText() {
     const text = inputText.trim();
-    if (!text || isTyping) return;
+    if (!text || !canSendText) return;
     void send(text).then((ok) => {
       if (ok) setInputText("");
     });
@@ -228,9 +233,10 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
               messages={messages}
               doc={doc}
               analysis={analysis}
-              incomeSent={incomeSent}
+              stage={stage}
+              incomeLocked={incomeLocked}
               incomeSelected={incomeSelected}
-              setIncomeSelected={setIncomeSelected}
+              setIncomeSelected={selectIncome}
               handleSendIncome={handleSendIncome}
             />
 
@@ -243,6 +249,7 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
               {sendError}
               <button
                 className="secondary-button"
+                disabled={incomeLocked && isTyping}
                 onClick={() =>
                   void retrySend().then((ok) => {
                     if (ok) setInputText("");
@@ -257,11 +264,8 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
             doc={doc}
             inputText={inputText}
             setInputText={setInputText}
-            isTyping={isTyping}
-            incomeSent={
-              incomeSent || !messages.some((m) => m.kind === "options")
-            }
-            hasOptions={messages.some((m) => m.kind === "options")}
+            canSendText={canSendText}
+            guided={stage !== "free-chat"}
             showPlus={showPlus}
             setShowPlus={setShowPlus}
             handleSendText={handleSendText}

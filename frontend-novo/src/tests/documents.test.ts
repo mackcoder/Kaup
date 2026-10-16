@@ -21,7 +21,7 @@ describe("documentos e sessão mock", () => {
     expect(filterDocuments(docs, "pending", "sem resultado")).toEqual([]);
     expect(new Set(docs.map((d) => d.id)).size).toBe(25);
   });
-  it("adiciona o File escolhido à categoria e nunca atribui finanças fictícias ao upload", async () => {
+  it("adiciona o File escolhido à categoria e identifica as finanças como exemplo, sem extraí-las do upload", async () => {
     const service = new MockService();
     const file = new File(["%PDF-1.4"], "meu-contrato.pdf", {
       type: "application/pdf",
@@ -31,10 +31,12 @@ describe("documentos e sessão mock", () => {
     expect(doc.categoryId).toBe("Casa");
     expect(countDocuments(await service.listDocuments()).all).toBe(26);
     const analysis = await service.getAnalysis(doc.id);
-    expect(analysis.facts).toEqual([]);
+    expect(analysis.facts?.[0].value).toBe("R$ 1.250,00");
+    expect(analysis.exampleNotice).toContain("Não foram extraídos");
+    expect(analysis.exampleNotice).toContain(file.name);
     expect(analysis.summary).toContain("Nenhum texto foi extraído");
     expect((await service.getMessages(doc.id))[0].text).toContain(
-      "não li o conteúdo",
+      "Não li o conteúdo",
     );
   });
   it("cancela upload sem criar documento", async () => {
@@ -56,7 +58,7 @@ describe("documentos e sessão mock", () => {
       const sending = s.sendMessage("carros-1", "Qual o prazo?");
       await vi.advanceTimersByTimeAsync(1700);
       const reply = await sending;
-      expect(reply.documentId).toBe("carros-1");
+      expect(reply.reply.documentId).toBe("carros-1");
       expect(
         (await s.getMessages("carros-1")).some(
           (m) => m.text === "Qual o prazo?",

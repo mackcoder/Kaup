@@ -7,9 +7,12 @@ export const INCOME_OPTIONS = [
   "Entre R$ 15.000 e R$ 20.000",
   "Mais de R$ 20.000",
   "Outra opção",
+  "Prefiro não informar",
 ];
 
 export const INCOME_RESPONSES: Record<string, string> = {
+  "Prefiro não informar":
+    "Tudo bem! Você não precisa informar sua renda. Podemos continuar explorando valores, prazos e cláusulas do contrato fictício de exemplo.",
   "Menos de R$ 3.000":
     "⚠️ A parcela comprometeria mais de 40% da sua renda. Especialistas recomendam no máximo 30%. Isso pode ser arriscado. Avalie bem antes de assinar.",
   "Entre R$ 3.000 e R$ 5.000":
@@ -125,4 +128,25 @@ export function getContextFiles(doc: DocumentView): ContextFile[] {
     ],
   };
   return [base, ...(extras[doc.catKey] ?? extras["Outros"])];
+}
+
+export const DEMO_DISCLAIMER =
+  "⚖️ Esta análise é demonstrativa e não substitui orientação jurídica ou financeira profissional.";
+export const DEMO_FACTS = [
+  { label: "Parcela mensal", value: "R$ 1.250,00" },
+  { label: "Prazo", value: "48 meses" },
+  { label: "Valor total estimado", value: "R$ 60.000,00" },
+];
+export const DEMO_KEY_POINTS = [
+  {
+    id: "demo-alert",
+    title: "Ponto de atenção fictício",
+    description: "Existem juros e encargos que merecem atenção.",
+    severity: "warning" as const,
+  },
+];
+export function demoIntroduction(name: string, uploaded: boolean) {
+  return uploaded
+    ? `Recebi “${name}”. Não li o conteúdo do arquivo e não executei OCR. Vamos simular a análise de um contrato fictício de exemplo: os valores e cláusulas abaixo não pertencem ao arquivo enviado.`
+    : "Analisei seu contrato. Encontrei alguns pontos importantes e preciso de uma informação para avaliar se as parcelas comprometem muito da sua renda.";
 }

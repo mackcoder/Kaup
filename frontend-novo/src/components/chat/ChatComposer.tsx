@@ -4,9 +4,8 @@ export default function ChatComposer({
   doc,
   inputText,
   setInputText,
-  isTyping,
-  incomeSent,
-  hasOptions,
+  canSendText,
+  guided,
   showPlus,
   setShowPlus,
   handleSendText,
@@ -15,9 +14,8 @@ export default function ChatComposer({
   doc: DocumentView;
   inputText: string;
   setInputText: (s: string) => void;
-  isTyping: boolean;
-  incomeSent: boolean;
-  hasOptions: boolean;
+  canSendText: boolean;
+  guided: boolean;
   showPlus: boolean;
   setShowPlus: (s: boolean | ((v: boolean) => boolean)) => void;
   handleSendText: () => void;
@@ -61,11 +59,11 @@ export default function ChatComposer({
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSendText()}
             placeholder={
-              incomeSent
+              !guided
                 ? "Pergunte sobre este contrato..."
                 : "Responda a pergunta acima primeiro..."
             }
-            disabled={isTyping || (!incomeSent && hasOptions)}
+            disabled={!canSendText}
             className="kaup-139"
             style={{ caretColor: doc.catColorLight }}
           />
@@ -74,15 +72,15 @@ export default function ChatComposer({
           <button
             aria-label="Enviar mensagem"
             onClick={handleSendText}
-            disabled={!inputText.trim() || isTyping}
+            disabled={!inputText.trim() || !canSendText}
             className="kaup-140"
             style={{
               background:
-                inputText.trim() && !isTyping
+                inputText.trim() && canSendText
                   ? `linear-gradient(135deg,${doc.catColor},${doc.catColorLight})`
                   : "#e2e8f0",
-              color: inputText.trim() && !isTyping ? "#fff" : "#94a3b8",
-              cursor: inputText.trim() && !isTyping ? "pointer" : "default",
+              color: inputText.trim() && canSendText ? "#fff" : "#94a3b8",
+              cursor: inputText.trim() && canSendText ? "pointer" : "default",
             }}
           >
             ↑

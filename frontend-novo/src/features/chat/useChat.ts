@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useApp } from "../../app/AppProvider";
 import { errorMessage } from "../../services";
 import type {
@@ -7,33 +7,27 @@ import type {
   DocumentAnalysis,
   DocumentView,
 } from "../../types/domain";
+import {
+  appendMessages,
+  chatSession,
+  stageFromHistory,
+  type PendingTurn,
+} from "./session";
 export function useChat(doc: DocumentView) {
   const { service, acceptDocument } = useApp();
-  const [messages, setMessages] = useState<ChatMessage[]>([]),
-    [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null),
-    [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
+  const store = useMemo(() => chatSession(service, doc.id), [service, doc.id]);
+  const session = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [analysis, setAnalysis] = useState<DocumentAnalysis | null>(null);
+  const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
   const [phase, setPhase] = useState<"loading" | "chatting">("loading");
   const [error, setError] = useState<string | null>(null),
-    [sendError, setSendError] = useState<string | null>(null),
-    [isTyping, setIsTyping] = useState(false),
     [attempt, setAttempt] = useState(0);
-  const active = useRef(true),
-    sendController = useRef<AbortController | null>(null),
-    sending = useRef(false),
-    failedText = useRef<string | null>(null);
-  useEffect(() => {
-    active.current = true;
-    return () => {
-      active.current = false;
-      sendController.current?.abort();
-    };
-  }, []);
   useEffect(() => {
     const controller = new AbortController();
     const timers: ReturnType<typeof setTimeout>[] = [];
+    let poll: ReturnType<typeof setTimeout> | undefined;
     setError(null);
     setPhase("loading");
-    let poll: ReturnType<typeof setTimeout> | undefined;
     async function load() {
       try {
         const result = await service.getAnalysis(doc.id, controller.signal);
@@ -53,47 +47,68 @@ export function useChat(doc: DocumentView) {
           poll = setTimeout(() => void load(), 2500);
           return;
         }
+        const current = store.getSnapshot();
         const [history, context] = await Promise.all([
-          service.getMessages(doc.id, controller.signal),
+          current.initialized
+            ? Promise.resolve(current.messages)
+            : service.getMessages(doc.id, controller.signal),
           service.getContext(doc.id, controller.signal),
         ]);
         if (controller.signal.aborted) return;
         setContextFiles(context);
         const show = () => {
           setPhase("chatting");
+          if (store.getSnapshot().initialized) return;
+          store.update({ initialized: true });
           if (
             service.mode === "mock" &&
-            !history.some((m) => m.role === "user")
+            stageFromHistory(service.mode, history) === "waiting-income"
           ) {
-            setMessages([]);
-            history.forEach((m, i) =>
+            // Same progressive reveal as the original: 0, 600, 1000, 1400ms.
+            history.forEach((message, index) =>
               timers.push(
                 setTimeout(
-                  () => setMessages((old) => [...old, m]),
-                  i === 0 ? 0 : i === 1 ? 600 : i === 2 ? 1000 : 1400,
+                  () => {
+                    store.update((s) => ({
+                      messages: appendMessages(s.messages, [message]),
+                      stage:
+                        message.kind === "options" ? "waiting-income" : s.stage,
+                    }));
+                  },
+                  (doc.isNew ? 300 : 0) +
+                    [0, 600, 1000, 1400][Math.min(index, 3)],
                 ),
               ),
             );
-          } else
-            setMessages(
-              history.length
-                ? history
-                : [
-                    {
-                      id: crypto.randomUUID(),
-                      documentId: doc.id,
-                      role: "ai",
-                      kind: "summary-card",
-                    },
-                  ],
-            );
+          } else {
+            const messages: ChatMessage[] = history.length
+              ? history
+              : [
+                  {
+                    id: `summary-${doc.id}`,
+                    documentId: doc.id,
+                    role: "ai",
+                    kind: "summary-card",
+                  },
+                ];
+            store.update({
+              messages,
+              stage: stageFromHistory(service.mode, history),
+            });
+          }
         };
-        if (doc.isNew && service.mode === "mock")
+        // Interrupted introductions resume once without replaying or duplicating messages.
+        if (current.initialized && current.stage === "intro")
+          store.update({
+            messages: await service.getMessages(doc.id, controller.signal),
+            stage: "waiting-income",
+          });
+        if (doc.isNew && service.mode === "mock" && !current.initialized)
           timers.push(setTimeout(show, 3200));
         else show();
         if (service.mode === "api") {
-          const current = await service.getDocument(doc.id, controller.signal);
-          if (!controller.signal.aborted) acceptDocument(current);
+          const latest = await service.getDocument(doc.id, controller.signal);
+          if (!controller.signal.aborted) acceptDocument(latest);
         }
       } catch (e) {
         if (!controller.signal.aborted) setError(errorMessage(e));
@@ -105,94 +120,135 @@ export function useChat(doc: DocumentView) {
       clearTimeout(poll);
       timers.forEach(clearTimeout);
     };
-  }, [doc.id, doc.isNew, service, attempt, acceptDocument]);
-  const incomeSent = messages.some((m) => m.role === "user");
-  async function send(text: string) {
-    if (!text.trim() || sending.current) return false;
-    const retry = failedText.current === text;
-    const message: ChatMessage = {
-      id: crypto.randomUUID(),
+  }, [doc.id, doc.isNew, service, attempt, acceptDocument, store]);
+  async function executeTurn(turn: PendingTurn) {
+    if (store.getSnapshot().isSending) return false;
+    const user: ChatMessage = {
+      id: `user-${turn.turnId}`,
       documentId: doc.id,
       role: "user",
       kind: "text",
-      text,
+      text: turn.text,
+      intent: turn.intent,
+      turnId: turn.turnId,
       state: "sending",
     };
-    if (!retry) setMessages((old) => [...old, message]);
-    setIsTyping(true);
-    sending.current = true;
-    setSendError(null);
-    const controller = new AbortController();
-    sendController.current = controller;
+    store.update((s) => ({
+      pendingTurn: turn,
+      isSending: true,
+      isTyping: true,
+      sendError: null,
+      stage: turn.intent === "income" ? "responding-income" : s.stage,
+      messages: appendMessages(s.messages, [user]).map((m) =>
+        m.id === user.id ? user : m,
+      ),
+    }));
     try {
-      const reply = await service.sendMessage(doc.id, text, controller.signal);
-      if (!active.current) return false;
-      setMessages((old) => [
-        ...old.map((m) =>
-          m.role === "user" && m.text === text
-            ? { ...m, state: "sent" as const }
-            : m,
+      // An accepted send belongs to the document session, even when its screen unmounts.
+      const result = await service.sendMessage(
+        doc.id,
+        turn.text,
+        undefined,
+        turn,
+      );
+      store.update((s) => ({
+        messages: appendMessages(
+          s.messages.map((m) =>
+            m.id === user.id ? { ...m, state: "sent" } : m,
+          ),
+          [result.reply],
         ),
-        reply,
-      ]);
-      failedText.current = null;
-      if (
-        text.includes("R$") ||
-        text === "Outra opção" ||
-        text === "Prefiro não informar"
-      )
-        setMessages((old) => [
-          ...old,
-          {
-            id: crypto.randomUUID(),
-            documentId: doc.id,
-            role: "ai",
-            kind: "disclaimer",
-            text:
-              service.mode === "mock"
-                ? "⚖️ Esta análise é demonstrativa e não substitui orientação jurídica ou financeira profissional."
-                : "⚖️ Esta análise é informativa e não substitui orientação jurídica ou financeira profissional.",
-          },
-        ]);
+        isTyping: false,
+      }));
+      if (result.followUps.length)
+        await new Promise<void>((resolve) => setTimeout(resolve, 800));
+      store.update((s) => ({
+        messages: appendMessages(s.messages, result.followUps),
+        stage: "free-chat",
+        pendingTurn: null,
+        isSending: false,
+        sendError: null,
+        draft:
+          turn.intent === "free-text" && s.draft === turn.text ? "" : s.draft,
+      }));
       return true;
     } catch (e) {
-      if (active.current && !controller.signal.aborted) {
-        failedText.current = text;
-        setSendError(errorMessage(e));
-        setMessages((old) =>
-          old.map((m) =>
-            m.role === "user" && m.text === text
-              ? { ...m, state: "failed" }
-              : m,
-          ),
-        );
-      }
+      store.update((s) => ({
+        isSending: false,
+        isTyping: false,
+        sendError: errorMessage(e),
+        stage: turn.intent === "income" ? "waiting-income" : s.stage,
+        messages: s.messages.map((m) =>
+          m.id === user.id ? { ...m, state: "failed" } : m,
+        ),
+      }));
       return false;
-    } finally {
-      sending.current = false;
-      if (active.current) setIsTyping(false);
     }
+  }
+  function selectIncome(value: string) {
+    const s = store.getSnapshot();
+    if (
+      s.stage === "waiting-income" &&
+      !s.pendingTurn &&
+      s.messages.some(
+        (m) => m.intent === "income" && m.options?.includes(value),
+      )
+    )
+      store.update({ incomeSelected: value });
+  }
+  function sendIncome() {
+    const s = store.getSnapshot();
+    return s.stage === "waiting-income" && s.incomeSelected && !s.pendingTurn
+      ? executeTurn({
+          turnId: crypto.randomUUID(),
+          intent: "income",
+          text: s.incomeSelected,
+        })
+      : Promise.resolve(false);
+  }
+  function send(text: string) {
+    const s = store.getSnapshot();
+    return s.stage === "free-chat" && text.trim() && !s.pendingTurn
+      ? executeTurn({
+          turnId: crypto.randomUUID(),
+          intent: "free-text",
+          text: text.trim(),
+        })
+      : Promise.resolve(false);
   }
   async function refreshContext() {
     try {
       setContextFiles(await service.getContext(doc.id));
     } catch (e) {
-      setSendError(errorMessage(e));
+      store.update({ sendError: errorMessage(e) });
     }
   }
   return {
-    messages,
+    messages: session.messages,
     analysis,
     contextFiles,
     phase,
     error,
-    sendError,
-    isTyping,
-    incomeSent,
+    sendError: session.sendError,
+    isTyping: session.isTyping,
+    isSending: session.isSending,
+    stage: session.stage,
+    incomeSelected: session.incomeSelected,
+    selectIncome,
+    sendIncome,
+    inputText: session.draft,
+    setInputText: (draft: string) => store.update({ draft }),
+    canSendText:
+      session.stage === "free-chat" &&
+      !session.isSending &&
+      !session.pendingTurn,
+    incomeLocked: session.stage !== "waiting-income" || !!session.pendingTurn,
     send,
     retry: () => setAttempt((n) => n + 1),
-    retrySend: () =>
-      failedText.current ? send(failedText.current) : Promise.resolve(false),
+    retrySend: () => {
+      const turn = store.getSnapshot().pendingTurn;
+      return turn ? executeTurn(turn) : Promise.resolve(false);
+    },
     refreshContext,
   };
 }

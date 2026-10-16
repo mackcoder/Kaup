@@ -1,5 +1,7 @@
 import type {
   ChatMessage,
+  ChatSendOptions,
+  ChatTurnResult,
   ContextFile,
   DocumentAnalysis,
   KaupDocument,
@@ -21,7 +23,8 @@ export interface KaupService {
     id: string,
     text: string,
     signal?: AbortSignal,
-  ): Promise<ChatMessage>;
+    options?: ChatSendOptions,
+  ): Promise<ChatTurnResult>;
   getContext(id: string, signal?: AbortSignal): Promise<ContextFile[]>;
   attachContext(
     id: string,

@@ -2,15 +2,18 @@ import { useState, useEffect } from "react";
 import type { DocumentView } from "../../types/domain";
 // ── Loading screen ────────────────────────────────────────────────────────────
 const LOAD_STEPS = [
-  "Lendo o documento...",
-  "Identificando cláusulas importantes...",
-  "Verificando pontos de atenção...",
-  "Análise pronta! ✅",
+  "Preparando exemplo fictício...",
+  "Simulando identificação de cláusulas...",
+  "Simulando pontos de atenção...",
+  "Demonstração pronta! ✅",
 ];
 
 function SpinDot({ color }: { color: string }) {
   return (
-    <div className="kaup-154" style={{ border: `2.5px solid ${color}` }} />
+    <div
+      className="kaup-154"
+      style={{ border: `2.5px solid ${color}`, borderTopColor: "transparent" }}
+    />
   );
 }
 

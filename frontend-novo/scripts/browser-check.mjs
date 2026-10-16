@@ -106,17 +106,28 @@ try {
   await page.getByRole("button", { name: "Confirmar e enviar" }).click();
   await page.waitForURL("**/chat");
   await page
-    .getByText(/não li o conteúdo do arquivo/)
+    .getByText(/Não li o conteúdo do arquivo/)
     .waitFor({ timeout: 8000 });
-  assert.equal(await page.getByText("R$ 1.250,00", { exact: true }).count(), 0);
+  await page
+    .getByRole("button", { name: "Prefiro não informar", exact: true })
+    .click();
+  await page.getByRole("button", { name: /Enviar resposta/ }).click();
+  await page.getByText(/não substitui orientação/).waitFor();
+  assert.equal(
+    await page
+      .getByRole("note")
+      .filter({ hasText: "Não foram extraídos" })
+      .count(),
+    1,
+  );
   await page
     .getByRole("textbox", { name: "Mensagem sobre o documento" })
     .fill("Qual a multa?");
   await page.getByRole("button", { name: "Enviar mensagem" }).click();
-  await page.getByText(/não tenho acesso ao texto deste arquivo/).waitFor();
+  await page.getByText(/Exemplo fictício: A multa por cancelamento/).waitFor();
   await capture(page, "fluxo-upload-chat");
   results.flows.push(
-    "upload PDF real → confirmação → chat sem finanças fictícias → pergunta/resposta ilustrativa",
+    "upload PDF → confirmação → exemplo fictício rotulado → renda opcional → chat ilustrativo",
   );
   await page.getByRole("button", { name: /Contexto/ }).click();
   await page

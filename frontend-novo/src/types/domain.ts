@@ -54,6 +54,7 @@ export interface DocumentAnalysis {
   ocrQualityWarning?: string | null;
   facts?: { label: string; value: string }[];
   demo?: boolean;
+  exampleNotice?: string;
 }
 export interface ChatMessage {
   id: string;
@@ -64,6 +65,8 @@ export interface ChatMessage {
   options?: string[];
   createdAt?: string;
   state?: "sent" | "sending" | "failed";
+  intent?: "income" | "free-text";
+  turnId?: string;
 }
 export interface ContextFile {
   emoji: string;
@@ -81,3 +84,15 @@ export interface UserProfile {
 }
 export type UploadState =
   "idle" | "confirming" | "uploading" | "failed" | "success";
+
+/** Client-side turn identity; demo intent is never imposed on the HTTP API. */
+export interface ChatSendOptions {
+  turnId: string;
+  intent: "income" | "free-text";
+}
+export interface ChatTurnResult {
+  reply: ChatMessage;
+  followUps: ChatMessage[];
+}
+export type GuidedStage =
+  "intro" | "waiting-income" | "responding-income" | "free-chat";

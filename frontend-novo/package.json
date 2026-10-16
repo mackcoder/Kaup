@@ -14,7 +14,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test:browser": "node scripts/browser-check.mjs",
     "format": "prettier --write src scripts *.{js,json,ts,html}",
-    "test:browser:api": "node scripts/api-browser-check.mjs"
+    "test:browser:api": "node scripts/api-browser-check.mjs",
+    "test:browser:chat": "node scripts/chat-browser-check.mjs"
   },
   "dependencies": {
     "@fontsource/nunito": "^5.2.0",

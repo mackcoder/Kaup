@@ -39,6 +39,11 @@ export default function SummaryCard({
           </div>
         </div>
       </div>
+      {analysis?.demo && analysis.exampleNotice && (
+        <p className="demo-summary-notice" role="note">
+          {analysis.exampleNotice}
+        </p>
+      )}
       {(analysis?.facts ?? []).map((row, i) => (
         <div key={i} className="kaup-183">
           <span className="kaup-184">{row.label}</span>

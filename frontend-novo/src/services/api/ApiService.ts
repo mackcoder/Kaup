@@ -60,7 +60,8 @@ export class ApiService implements KaupService {
     );
     if (m.documentId !== id || m.role !== "ai")
       throw new ApiError("Resposta de chat incompatível com o documento.");
-    return m;
+    // The server defines the conversation; no local income prompt or disclaimer.
+    return { reply: m, followUps: [] };
   }
   async getContext(id: string, signal?: AbortSignal) {
     const doc = await this.getDocument(id, signal);

@@ -4,11 +4,17 @@ import {
   getFreeTextResponse,
   INCOME_OPTIONS,
   INCOME_RESPONSES,
+  DEMO_FACTS,
+  DEMO_KEY_POINTS,
+  DEMO_DISCLAIMER,
+  demoIntroduction,
 } from "../../data/chat";
 import { presentDocument } from "../../styles/presenters";
 import type { KaupService } from "../contracts/KaupService";
 import type {
   ChatMessage,
+  ChatSendOptions,
+  ChatTurnResult,
   ContextFile,
   DocumentAnalysis,
   KaupDocument,
@@ -45,6 +51,8 @@ export class MockService implements KaupService {
     })),
   );
   private conversations = new Map<string, ChatMessage[]>();
+  private completedTurns = new Map<string, ChatTurnResult>();
+  private activeTurns = new Map<string, Promise<ChatTurnResult>>();
   private contexts = new Map<string, ContextFile[]>();
   private profile: UserProfile = {
     name: "João da Silva",
@@ -105,23 +113,11 @@ export class MockService implements KaupService {
       summary: doc.uploaded
         ? "Arquivo recebido para demonstração. Nenhum texto foi extraído e nenhuma cláusula foi analisada."
         : "Resumo fictício do protótipo. Valores ilustrativos, sem avaliação jurídica ou financeira real.",
-      keyPoints: doc.uploaded
-        ? []
-        : [
-            {
-              id: "demo-alert",
-              title: "Ponto de atenção fictício",
-              description: "Existem juros e encargos que merecem atenção.",
-              severity: "warning",
-            },
-          ],
-      facts: doc.uploaded
-        ? []
-        : [
-            { label: "Parcela mensal", value: "R$ 1.250,00" },
-            { label: "Prazo", value: "48 meses" },
-            { label: "Valor total estimado", value: "R$ 60.000,00" },
-          ],
+      keyPoints: structuredClone(DEMO_KEY_POINTS),
+      facts: structuredClone(DEMO_FACTS),
+      exampleNotice: doc.uploaded
+        ? `Valores de um contrato fictício de exemplo. Não foram extraídos de “${doc.name}”.`
+        : undefined,
       demo: true,
     };
   }
@@ -141,83 +137,94 @@ export class MockService implements KaupService {
         options,
         state: "sent",
       });
-      this.conversations.set(
-        id,
-        doc.uploaded
-          ? [
-              msg(
-                "text",
-                `Recebi “${doc.name}”. Esta é uma demonstração: não li o conteúdo do arquivo e não executei OCR.`,
-              ),
-              msg("summary-card"),
-              msg(
-                "text",
-                "Você pode testar o chat com perguntas. As respostas serão ilustrativas.",
-              ),
-            ]
-          : [
-              msg(
-                "text",
-                "Analisei seu contrato. Encontrei alguns pontos importantes e preciso de uma informação para avaliar se as parcelas comprometem muito da sua renda.",
-              ),
-              msg("summary-card"),
-              msg("text", "Qual é a sua renda mensal aproximada?"),
-              msg("options", undefined, [
-                ...INCOME_OPTIONS,
-                "Prefiro não informar",
-              ]),
-            ],
-      );
+      this.conversations.set(id, [
+        msg("text", demoIntroduction(doc.name, !!doc.uploaded)),
+        msg("summary-card"),
+        msg("text", "Qual é a sua renda mensal aproximada?"),
+        { ...msg("options", undefined, [...INCOME_OPTIONS]), intent: "income" },
+      ]);
     }
     return structuredClone(this.conversations.get(id) ?? []);
   }
-  async sendMessage(id: string, text: string, signal?: AbortSignal) {
-    const doc = await this.getDocument(id);
-    const history = await this.getMessages(id);
-    await new Promise<void>((resolve, reject) => {
-      const t = setTimeout(resolve, 1600);
-      signal?.addEventListener(
-        "abort",
-        () => {
-          clearTimeout(t);
-          reject(new DOMException("Cancelado", "AbortError"));
-        },
-        { once: true },
-      );
-    });
-    signal?.throwIfAborted();
+  async sendMessage(
+    id: string,
+    text: string,
+    signal?: AbortSignal,
+    options?: ChatSendOptions,
+  ): Promise<ChatTurnResult> {
+    await this.getDocument(id);
+    const turn = options ?? {
+      turnId: crypto.randomUUID(),
+      intent: "free-text" as const,
+    };
+    if (turn.intent === "income" && !INCOME_OPTIONS.includes(text))
+      throw new Error("Escolha uma das opções de renda.");
+    const key = `${id}:${turn.turnId}`;
+    const completed = this.completedTurns.get(key);
+    if (completed) return structuredClone(completed);
+    const active = this.activeTurns.get(key);
+    if (active) return structuredClone(await active);
+    const sending = this.completeTurn(id, text, turn, signal);
+    this.activeTurns.set(key, sending);
+    try {
+      return structuredClone(await sending);
+    } finally {
+      this.activeTurns.delete(key);
+    }
+  }
+  private async completeTurn(
+    id: string,
+    text: string,
+    turn: ChatSendOptions,
+    signal?: AbortSignal,
+  ): Promise<ChatTurnResult> {
+    await this.getMessages(id);
+    await waitForDemo(turn.intent === "income" ? 1800 : 1600, signal);
     const reply: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: `reply-${turn.turnId}`,
       documentId: id,
       role: "ai",
       kind: "text",
-      text: doc.uploaded
-        ? "Demonstração: não tenho acesso ao texto deste arquivo. Quando o backend implementar OCR e análise, poderei responder com base no documento."
-        : `Exemplo fictício: ${INCOME_RESPONSES[text] ?? getFreeTextResponse(text)}`,
+      text: `Exemplo fictício: ${turn.intent === "income" ? INCOME_RESPONSES[text] : getFreeTextResponse(text)}`,
+      intent: turn.intent,
+      turnId: turn.turnId,
       state: "sent",
       createdAt: new Date().toISOString(),
     };
+    const followUps: ChatMessage[] =
+      turn.intent === "income"
+        ? [
+            {
+              id: `disclaimer-${turn.turnId}`,
+              documentId: id,
+              role: "ai",
+              kind: "disclaimer",
+              text: DEMO_DISCLAIMER,
+              intent: "income",
+              turnId: turn.turnId,
+              state: "sent",
+            },
+          ]
+        : [];
+    const history = this.conversations.get(id) ?? [];
     history.push(
       {
-        id: crypto.randomUUID(),
+        id: `user-${turn.turnId}`,
         documentId: id,
         role: "user",
         kind: "text",
         text,
+        intent: turn.intent,
+        turnId: turn.turnId,
         state: "sent",
       },
       reply,
+      ...followUps,
     );
-    if (INCOME_OPTIONS.includes(text) || text === "Prefiro não informar")
-      history.push({
-        id: crypto.randomUUID(),
-        documentId: id,
-        role: "ai",
-        kind: "disclaimer",
-        text: "⚖️ Esta análise é demonstrativa e não substitui orientação jurídica ou financeira profissional.",
-      });
     this.conversations.set(id, history);
-    return structuredClone(reply);
+    const result = { reply, followUps };
+    this.completedTurns.set(`${id}:${turn.turnId}`, result);
+    return result;
   }
   async getContext(id: string) {
     const doc = await this.getDocument(id);
@@ -255,4 +262,22 @@ export class MockService implements KaupService {
   async health() {
     return "Modo mock: nenhum backend conectado.";
   }
+}
+
+function waitForDemo(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const cancel = () => {
+      clearTimeout(timer);
+      reject(signal?.reason);
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", cancel);
+      resolve();
+    }, ms);
+    signal?.addEventListener("abort", cancel, { once: true });
+  });
 }

@@ -1,6 +1,7 @@
 import SummaryCard from "./SummaryCard";
 import type {
   ChatMessage,
+  GuidedStage,
   DocumentAnalysis,
   DocumentView,
 } from "../../types/domain";
@@ -8,7 +9,8 @@ export default function MessageList({
   messages,
   doc,
   analysis,
-  incomeSent,
+  stage,
+  incomeLocked,
   incomeSelected,
   setIncomeSelected,
   handleSendIncome,
@@ -16,7 +18,8 @@ export default function MessageList({
   messages: ChatMessage[];
   doc: DocumentView;
   analysis: DocumentAnalysis | null;
-  incomeSent: boolean;
+  stage: GuidedStage;
+  incomeLocked: boolean;
   incomeSelected: string | null;
   setIncomeSelected: (v: string) => void;
   handleSendIncome: () => void;
@@ -35,12 +38,13 @@ export default function MessageList({
           );
         }
 
-        if (msg.kind === "options" && !incomeSent) {
+        if (msg.kind === "options" && stage !== "free-chat") {
           return (
             <div key={msg.id} className="kaup-164">
               {(msg.options ?? []).map((opt) => (
                 <button
                   key={opt}
+                  disabled={incomeLocked}
                   aria-pressed={incomeSelected === opt}
                   onClick={() => setIncomeSelected(opt)}
                   className="kaup-165"
@@ -78,6 +82,7 @@ export default function MessageList({
 
               {incomeSelected && (
                 <button
+                  disabled={incomeLocked}
                   onClick={handleSendIncome}
                   className="kaup-169"
                   style={{

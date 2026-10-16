@@ -75,3 +75,9 @@ O modo API foi verificado com respostas HTTP interceptadas **apenas no teste**: 
 4. Definir armazenamento, retenção/consentimento/LGPD, exportação e exclusão de conta/documentos.
 5. Aprovar formatos/MIME, validação real do arquivo, limites, CORS, erros e estratégia assíncrona. Decidir contrato de anexos e narração/áudio.
 6. Manter PostgreSQL e segredos exclusivamente no backend; health não comprova funcionamento desses serviços.
+
+## Revisão: restauração da jornada demonstrativa do chatbot
+
+A pedido do usuário, o chat de uploads passa a demonstrar a mesma jornada guiada dos documentos fictícios existentes, com valores de um contrato de exemplo explicitamente identificados. Isso substitui a simplificação inicial dos uploads. A etapa é explícita e preservada por documento durante a sessão; confirmação e retry usam IDs estáveis. O modo API não recebe roteiro fictício nem aviso baseado no texto da pergunta.
+
+Validações desta revisão: lint, **44 testes em quatro arquivos** e build aprovados; regressão HTTP no Chrome aprovada. Detalhes dos arquivos, comportamento e evidências visuais estão em [CHAT_FLOW_NOTES.md](CHAT_FLOW_NOTES.md). Os resultados de 24 testes acima correspondem à primeira migração.
