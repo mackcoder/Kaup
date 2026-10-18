@@ -1,16 +1,15 @@
 package com.kaup.controller;
 
-import java.io.IOEXCEPTION;
+import java.io.IOException;
 import java.util.Set;
 
-
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.kaup.dto.AnaliseContratoResponse;
@@ -23,36 +22,39 @@ import com.kaup.service.OcrService;
 @RequestMapping("/api/analise")
 public class AnaliseController {
 
-    private static final Set<String> TIPOS ACEITOS = Set.of("application/pdf", "image/pdf", "image/jpeg");
-    private final OcrService ocerService;
+    private static final Set<String> TIPOS_ACEITOS = Set.of(
+            "application/pdf", "image/png", "image/jpeg");
+
+    private final OcrService ocrService;
     private final GeminiService geminiService;
 
-    public AnaliseController(OcrService ocrService, GeminiService geminiService){
+    public AnaliseController(OcrService ocrService, GeminiService geminiService) {
         this.ocrService = ocrService;
         this.geminiService = geminiService;
     }
 
     @GetMapping("/health")
-    public String checkHealth(){
+    public String checkHealth() {
         return "Backend do Kaup está rodando e integrado!";
     }
 
     /** Fluxo completo: arquivo do contrato -> OCR -> IA -> análise estruturada. */
-    @PostMapping(value ="\contrato", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/contrato", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AnaliseContratoResponse analisarContrato(@RequestParam("arquivo") MultipartFile arquivo)
-        throws IOException {
-            validar(arquivo);
-            String texto = ocrService.extrairTexto(arquivo);
-            if (texto == null || texto.isBlank()) {
-                throw new ContratoInvalidoException(
-                        "Não foi possível ler texto no arquivo enviado. Tente uma foto mais nítida.");
-            }
-            return new AnaliseContratoResponse(texto, geminiService.interpretar(texto));
+            throws IOException {
+        validar(arquivo);
+        String texto = ocrService.extrairTexto(arquivo);
+        if (texto == null || texto.isBlank()) {
+            throw new ContratoInvalidoException(
+                    "Não foi possível ler texto no arquivo enviado. Tente uma foto mais nítida.");
         }
+        return new AnaliseContratoResponse(texto, geminiService.interpretar(texto));
+    }
 
-    @PostMapping(value = "/texto", comsume = MediaTypeAPPLICATION_JSON_VALUE)
-    public AnalisadorContratoResponse analisarTexto(@RequestBody TextoContratoRequest request){
-        if(request.texto() == null || request.texto().isBlank()){
+    /** Mesmo fluxo a partir de texto já extraído (pula o OCR). Útil para testar a IA. */
+    @PostMapping(value = "/texto", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public AnaliseContratoResponse analisarTexto(@RequestBody TextoContratoRequest request) {
+        if (request.texto() == null || request.texto().isBlank()) {
             throw new ContratoInvalidoException("O campo 'texto' é obrigatório.");
         }
         return new AnaliseContratoResponse(request.texto(), geminiService.interpretar(request.texto()));
