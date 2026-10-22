@@ -1,4 +1,4 @@
-package com.kaup.dito;
+package com.kaup.dto;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
