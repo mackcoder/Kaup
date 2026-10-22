@@ -1,0 +1,12 @@
+{
+  "title": "Kaup | Entenda seus contratos",
+  "description": "Analise contratos com clareza. Veja valores, prazos, juros e pontos de atenção em uma linguagem simples.",
+  "language": "pt-BR",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": true,
+    "ignoreReducedMotion": false
+  }
+}

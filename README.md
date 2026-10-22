@@ -2,9 +2,9 @@
 
 # 📚 *AI Contract Analyser*
 
-> **Discipline:** Laboratório de Engenharia de Software  
-> **Teacher:** Gustavo Moreira Calixto 
-> **Methodology:** Scrum / Agile
+> **Disciplina:** Laboratório de Engenharia de Software  
+> **Docente:** Gustavo Moreira Calixto
+> **Metodologia:** Scrum / Agile
 
 ---
 

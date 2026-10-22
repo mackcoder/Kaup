@@ -78,9 +78,36 @@ O projeto visa auxiliar analfabetos funcionais na interpretação de contratos c
 ---
 
 ### 4. 🚀 Publicação e Deploy (CI/CD)
-* **Hospedagem do Frontend:** 
-* **Hospedagem do Backend:** 
-* **Segurança na Publicação:** 
+
+- **Hospedagem do Frontend:** Netlify, com deploy automático a cada push na
+  branch `main` do GitHub. Cada pull request gera um preview para revisão. O
+  site é servido por HTTPS e a URL do backend fica em variável de ambiente
+  do Netlify, sem ir para o código.
+
+- **Hospedagem do Backend:** o backend Spring Boot roda em container Docker
+  (o `Dockerfile` já existe) numa plataforma de containers na nuvem, como
+  Render, Railway ou Google Cloud Run. O Postgres fica num serviço gerenciado
+  da mesma plataforma ou de um provedor como Neon ou Supabase. O banco não é
+  exposto à internet, e só o backend se conecta a ele.
+  O pipeline é no GitHub Actions: a cada push, roda build e testes, e se
+  passarem, a plataforma publica a nova imagem.
+
+- **Segurança na Publicação:**
+  - **Segredos:** as chaves (`GEMINI_API_KEY`, `EXTRACT_API_KEY`) e as
+    credenciais do banco ficam em variáveis de ambiente da plataforma e em
+    GitHub Secrets. O `.env` está no `.gitignore` e nada é versionado.
+  - **Credenciais:** a senha de desenvolvimento do banco
+    (`senha_segura`) é trocada por uma senha forte em produção.
+  - **HTTPS e CORS:** todo o tráfego usa HTTPS, e o CORS do backend aceita
+    apenas o domínio do frontend, sem `*`.
+  - **Uploads:** só PDF, PNG e JPEG, com limite de 10 MB (já implementado).
+  - **Proteção de abuso:** limite de requisições por usuário, para evitar
+    gasto excessivo nas APIs pagas de IA e OCR.
+  - **Dados sensíveis (LGPD):** contratos têm dados pessoais. O texto
+    extraído não é gravado em logs, e o grupo documenta que o conteúdo é
+    enviado a serviços externos (OCR e Gemini).
+  - **Repositório:** proteção da branch `main` (merge só por pull request,
+    com testes passando) e rotação das chaves caso alguma vaze.
 
 ---
 
