@@ -1,7 +1,0 @@
-target/
-.env
-.env.*
-!.env.example
-.m2/
-data/
-*.log
