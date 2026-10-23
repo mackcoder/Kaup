@@ -1,0 +1,41 @@
+name: kaup-backend-novo
+services:
+  postgres:
+    image: postgres:17.9-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-kaup_novo}
+      POSTGRES_USER: ${DB_USER:-kaup_app}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env ou ambiente}
+    ports:
+      - "127.0.0.1:${DB_PORT:-55432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  api:
+    build: .
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-kaup_novo}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-kaup_app}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no .env ou ambiente}
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 8080
+      MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-10MB}
+      MAX_REQUEST_SIZE: ${MAX_REQUEST_SIZE:-11MB}
+      AUTH_BCRYPT_STRENGTH: ${AUTH_BCRYPT_STRENGTH:-12}
+      AUTH_MAX_ATTEMPTS: ${AUTH_MAX_ATTEMPTS:-20}
+      AUTH_ATTEMPT_WINDOW: ${AUTH_ATTEMPT_WINDOW:-PT1M}
+      SESSION_TIMEOUT: ${SESSION_TIMEOUT:-30m}
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+volumes:
+  postgres_data:

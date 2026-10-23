@@ -1,0 +1,138 @@
+openapi: 3.0.3
+info:
+  title: Kaup API — endpoints implementados
+  version: 0.2.0
+  description: Fases 1–2; documentos, análise, chat e perfil ainda não implementados.
+servers:
+  - url: /api
+paths:
+  /analise/health:
+    get:
+      summary: Liveness HTTP
+      responses:
+        '200':
+          description: Aplicação responde; não consulta dependências
+          content:
+            text/plain:
+              schema: {type: string}
+  /auth/csrf:
+    get:
+      summary: Obtém token CSRF mascarado e sessão anônima, se necessário
+      responses:
+        '200':
+          description: Sem cache; navegador mantém cookie KAUPSESSION HttpOnly
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [headerName, token]
+                properties:
+                  headerName: {type: string, enum: [X-CSRF-TOKEN]}
+                  token: {type: string}
+  /auth/register:
+    post:
+      summary: Cadastra conta sem autenticar a sessão
+      security: [{csrf: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: {type: string, minLength: 1, maxLength: 120}
+                email: {type: string, format: email, maxLength: 254}
+                password:
+                  type: string
+                  format: password
+                  writeOnly: true
+                  minLength: 12
+                  maxLength: 72
+                  description: No máximo 72 bytes UTF-8, sem trim ou truncamento
+      responses:
+        '201': {$ref: '#/components/responses/User'}
+        '400': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+        '409': {$ref: '#/components/responses/Error'}
+        '415': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+  /auth/login:
+    post:
+      summary: Autentica e renova sessão; buscar novo CSRF após sucesso
+      security: [{csrf: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+                password:
+                  type: string
+                  format: password
+                  writeOnly: true
+                  minLength: 1
+                  maxLength: 72
+                  description: No máximo 72 bytes UTF-8; senha preservada literalmente
+      responses:
+        '200': {$ref: '#/components/responses/User'}
+        '400': {$ref: '#/components/responses/Error'}
+        '401': {$ref: '#/components/responses/Error'}
+        '403': {$ref: '#/components/responses/Error'}
+        '415': {$ref: '#/components/responses/Error'}
+        '429': {$ref: '#/components/responses/Error'}
+  /auth/me:
+    get:
+      summary: Identifica a conta habilitada da sessão atual
+      security: [{sessionCookie: []}]
+      responses:
+        '200': {$ref: '#/components/responses/User'}
+        '401': {$ref: '#/components/responses/Error'}
+  /auth/logout:
+    post:
+      summary: Invalida sessão e cookie; buscar novo CSRF antes de outra escrita
+      description: Também é idempotente para sessão anônima com CSRF válido. GET não efetua logout.
+      security: [{csrf: []}]
+      responses:
+        '204': {description: Sessão invalidada, corpo vazio}
+        '403': {$ref: '#/components/responses/Error'}
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: KAUPSESSION
+    csrf:
+      type: apiKey
+      in: header
+      name: X-CSRF-TOKEN
+      description: Exige também o cookie da sessão que originou o token
+  schemas:
+    User:
+      type: object
+      required: [id, name, email]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        email: {type: string, format: email}
+    Error:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        requestId: {type: string, format: uuid}
+  responses:
+    User:
+      description: Conta, sem senha ou hash
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/User'}
+    Error:
+      description: Erro controlado; X-Request-Id corresponde ao campo requestId
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
