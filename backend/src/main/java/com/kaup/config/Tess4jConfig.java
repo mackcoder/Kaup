@@ -1,6 +1,7 @@
 package com.kaup.config;
 
 import net.sourceforge.tess4j.Tesseract;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -8,10 +9,10 @@ import org.springframework.context.annotation.Configuration;
 public class Tess4jConfig {
 
     @Bean
-    public Tesseract tesseract() {
+    public Tesseract tesseract(@Value("${ocr.tessdata-path}") String tessdataPath, @Value("${ocr.language}") String language) {
         Tesseract tesseract = new Tesseract();
-        tesseract.setDatapath("/usr/share/tessdata"); // Caminho padrão no Linux/Docker Alpine
-        tesseract.setLanguage("por"); // Configura idioma Português
+        tesseract.setDatapath(tessdataPath); // Caminho padrão no Linux/Docker Alpine
+        tesseract.setLanguage(language); // Configura idioma Português
         return tesseract;
     }
 }
