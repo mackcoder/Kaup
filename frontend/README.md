@@ -86,7 +86,9 @@ Com URL vazia, `/api` usa o proxy Vite para `http://localhost:8080`, e os cookie
 |---|---|
 | Descobrir quem está logado | `GET /api/auth/eu` |
 | Criar conta (já entra) / entrar / sair | `POST /api/auth/cadastro`, `/entrar`, `/sair` |
+| Esqueci minha senha (simulado: sem e-mail, código fixo) | `POST /api/auth/recuperar/solicitar`, `/recuperar/redefinir` |
 | Apagar a conta (e documentos, conversas) | `DELETE /api/conta` |
+| Baixar meus dados (JSON) | `GET /api/conta/exportar` |
 | Listar / enviar documento | `GET` / `POST /api/documentos` (envio: FormData com `file` e `categoryId` opcional) |
 | Ver / excluir documento | `GET` / `DELETE /api/documentos/{id}` |
 | Análise do documento | `GET /api/documentos/{id}/analise` |
@@ -96,6 +98,10 @@ Com URL vazia, `/api` usa o proxy Vite para `http://localhost:8080`, e os cookie
 **Sessão e segurança.** Sem login só aparecem as telas de entrar e criar conta, e o endereço pedido é mantido (depois de entrar, a pessoa continua onde queria). A sessão é um cookie que o JavaScript não lê; o backend entrega um token CSRF no cookie `XSRF-TOKEN`, que o `http.ts` devolve no cabeçalho `X-XSRF-TOKEN` em toda requisição que altera dados. Um 401 fora das telas de login (sessão expirada) leva de volta para o login; falha de rede ao descobrir a sessão mostra o erro, não a tela de entrar. Ao entrar ou sair, documentos, perfil e conversas da pessoa anterior são descartados. O modo demonstração (mock) continua sem login.
 
 **Mensagens de erro.** O `http.ts` mostra o texto que o backend escreveu para o usuário (`detail` do RFC 7807). Um 5xx sem corpo (o proxy sem backend por trás) orienta a conferir se o backend está rodando; um 500 real do servidor mantém a mensagem genérica. Não há fallback para mocks em modo API.
+
+**Limite de tentativas e recuperação de senha.** Depois de 5 senhas erradas seguidas o backend bloqueia aquele e-mail por 10 segundos (HTTP 429); a tela mostra a mensagem do servidor e a pessoa tenta de novo. A tela `/esqueci-senha` tem dois passos (e-mail; depois código e nova senha) e não deixa a pessoa logada: leva para entrar. Enquanto não há e-mail real, o código é sempre o do backend (`KAUP_CODIGO_FAKE`, padrão 676869); a variável opcional `VITE_FAKE_RESET_CODE` só faz a tela lembrar esse código em ambiente de teste (deixe vazia em produção). A conta de administrador nunca tem a senha alterada por aqui.
+
+**Meus dados e prazo.** Em Configurações, "Baixar minhas informações" salva `kaup-meus-dados.json` (conta, preferências, documentos, análises e conversas, sem a senha) e um aviso informa depois de quantos dias os documentos são apagados (`retentionDays`, vindo de `GET /api/perfil`; sem o campo, o aviso some).
 
 **Administrador.** A conta de administrador vê os documentos de todos. Ao abrir o de outra pessoa, o chat mostra um aviso de somente leitura e esconde o botão de excluir (o backend também recusa).
 

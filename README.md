@@ -85,6 +85,8 @@ Always start the backend before the frontend. Without it the app shows "Não foi
 
 **Accounts.** Create an account on the "Criar conta" screen (name, e-mail, password of 8+ characters and its confirmation). Each person only sees their own documents. A development administrator account is created on startup (`ADMIN@ADMIN` / `ADMIN`): it can **read** every document but cannot change other people's documents, and its account cannot be deleted. **Set `KAUP_ADMIN_PASSWORD` (or `KAUP_ADMIN_ENABLED=false`) before publishing the system.** The first regular user to sign up adopts any documents that existed before accounts were introduced.
 
+**Password safety, recovery, export and retention.** After 5 wrong passwords in a row the login of that e-mail is blocked for 10 seconds (HTTP 429), never longer. "Esqueci minha senha" is **simulated** for now: no e-mail is sent and the code is always `676869` (`KAUP_CODIGO_FAKE`; set it empty to turn recovery off); the administrator's password can never be changed through the app. The profile screen has "Baixar minhas informações" (a JSON with the account, documents, analyses and conversations; never the password) and documents are deleted automatically after `KAUP_RETENCAO_DIAS` days (default 180; `0` turns it off).
+
 **Tests.** Backend: `cd backend && mvn verify` (or run Maven inside Docker). Frontend: `cd frontend && npm test`.
 
 ---

@@ -412,15 +412,41 @@ Decisões do usuário: login por **e-mail e senha**; sessão em **cookie guardad
 - Verificado com o Gemini de verdade: renda liberada responde a faixa e **não** a traz em perguntas sem relação (alienação fiduciária, valor da entrada); "oi, tudo bem?" é cumprimentado com simpatia; "hello world em Python", poesia e lição de matemática são recusados com gentileza; renda bloqueada → "não tenho essa informação", usa a renda digitada na conversa e **0** citações da faixa antiga depois do bloqueio. Backend: 111 testes passando.
 - **Ressalva:** poucas conversas testadas e o comportamento de um modelo de linguagem varia de uma execução para outra; vale uma revisão humana de conversas reais.
 
-### Fase 5 — Privacidade (parte feita junto com a Fase 4)
+### Fase 5 — Privacidade e segurança
 - [x] Spring Security, `Usuario`, dono nos documentos, checagem de dono em todo acesso por id
 - [x] Telas de cadastro e login, credenciais (cookie) no `http.ts`, tratamento de 401
 - [x] `DELETE /api/documentos/{id}` + botão "Excluir documento" (com confirmação) para o dono
 - [x] Exclusão de conta (apaga documentos e conversas e encerra as sessões)
-- [ ] Exportação dos dados da pessoa ("Baixar minhas informações" continua sem função)
-- [ ] Definir retenção do texto extraído e consentimento (LGPD); avaliar anonimização antes do Gemini
-- [ ] Limite de tentativas de login, redefinição de senha
+- [x] Exportação dos dados da pessoa (`GET /api/conta/exportar`, botão "Baixar minhas informações")
+- [x] Retenção: documentos de usuários expiram após `KAUP_RETENCAO_DIAS` (padrão 180) — ver "Fase 5b" abaixo
+- [x] Limite de tentativas de login (5 erros → bloqueio de no máximo 10 s)
+- [x] Redefinição de senha **simulada** (código fixo `676869`, sem e-mail; o ADMIN nunca é alterado)
+- [ ] Verificação de e-mail no cadastro (depende de e-mail real) e recuperação de senha com e-mail de verdade (código aleatório com validade)
+- [ ] Consentimento (LGPD) e avaliar anonimização do texto antes do Gemini
 - [ ] CORS, HTTPS e cookie `Secure` para o ambiente de deploy (RNF02); trocar a senha do administrador
+
+#### Fase 5b — Resultado (2026-10-30)
+
+**Decisões do usuário:** limite de login por e-mail e em memória, bloqueio de **no máximo 10 s e nunca permanente**; recuperação de senha **fake** (código sempre `676869`) e o **ADMIN nunca** pode ter a senha alterada pelo app; exportação em JSON; documentos expiram em 180 dias; verificação de e-mail no cadastro fica de fora por ora.
+
+**Backend**
+- `LimiteDeTentativas` (em memória, relógio injetável): 5 erros dentro de 1 min bloqueiam a chave por 10 s e a contagem recomeça; acertar zera. Chaves antigas são descartadas (não enche a memória). `429` com `Retry-After`. Vale para `entrar:<e-mail>` e para o código da recuperação (`recuperar:<e-mail>`), para que o código fixo não seja adivinhado no tentativa e erro. Bloqueado, nem a senha certa entra.
+- `POST /api/auth/recuperar/solicitar` (204 sempre, sem revelar se o e-mail existe) e `/recuperar/redefinir` (e-mail, código, nova senha com as regras do cadastro). Código errado, e-mail sem conta e **conta ADMIN** respondem exatamente igual (400 "Código inválido…"), a senha do ADMIN não muda e as sessões não são tocadas. Trocar a senha encerra as sessões abertas da conta. `KAUP_CODIGO_FAKE` vazio desliga a recuperação; o código é comparado em tempo constante.
+- `GET /api/conta/exportar`: JSON anexado (`kaup-meus-dados.json`, `Cache-Control: no-store`) com conta, preferências, documentos (texto extraído e análise) e conversas **só da própria pessoa** (o ADMIN exporta apenas o que é dele). Nunca inclui a senha nem o hash.
+- `Retencao`: tarefa diária (03:30, `KAUP_RETENCAO_CRON`) apaga documentos de usuários **comuns** mais velhos que `KAUP_RETENCAO_DIAS` (conversas saem junto, pela cascata do banco). Não toca nos documentos sem dono (de antes das contas) nem nos do ADMIN, nem na conta. `0` desliga. `GET /api/perfil` passou a trazer `retentionDays`.
+- Backend: 142 testes passando (31 novos: limitador, recuperação, exportação, retenção, 429 e rotas).
+
+**Frontend:** tela `/esqueci-senha` (2 passos) com link na tela de entrar; mensagem do 429 na tela de entrar; "Baixar minhas informações" faz o download real; aviso do prazo no perfil. A dica do código fixo só aparece se `VITE_FAKE_RESET_CODE` estiver definida (hoje só no `frontend/.env` local). 111 testes passando; `tsc`, `eslint` e `build` limpos.
+
+**Verificado de verdade** (pilha isolada: outro Postgres e outro backend na porta 8081, para não mexer nos dados reais) e no Chrome sem cabeça: 5 erros seguidos → 6ª tentativa com a senha certa dá 429 com `Retry-After: 10`, outro e-mail não é afetado, e depois de 10 s o login volta; recuperação (código errado, e-mail sem conta e ADMIN com o código certo dão a mesma resposta; Ana troca a senha, a sessão antiga cai, a senha antiga deixa de valer); ADMIN continua com a senha antiga (hash idêntico no banco); a exportação só traz os dados de quem pediu e não vaza hash; a retenção apagou o documento velho **e a mensagem dele**, e manteve o recente, o órfão antigo e o do ADMIN; os passos novos do CI rodam.
+
+**Ressalvas**
+- O limite é **por e-mail**, em memória: quem erra com e-mails diferentes não é freado (cada um tem a sua cota), e reiniciar o backend zera os contadores. Vários backends em paralelo teriam contadores separados.
+- Alguém pode bloquear o login de outra pessoa por 10 s errando a senha dela de propósito (incômodo curto, por escolha do projeto).
+- O código `676869` é público: **qualquer pessoa que souber o e-mail de uma conta comum consegue trocar a senha dela**. Aceitável só em desenvolvimento; antes de publicar, desligue (`KAUP_CODIGO_FAKE=` vazio) ou implemente o e-mail real.
+- A retenção apaga por `criadoEm` do documento; ninguém é avisado antes. Ao ligar numa base com dados antigos, documentos com mais de 180 dias somem na primeira execução (03:30). Os documentos sem dono continuam sem expirar.
+- O ADMIN não tem como recuperar a senha pelo app; se for esquecida, só alterando direto no banco ou recriando a conta.
+- Verificação de e-mail no cadastro segue pendente.
 
 ### Fase 6 — Extras
 - [ ] Upload assíncrono (`202`) com executor próprio
