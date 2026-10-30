@@ -203,7 +203,7 @@ O `API_CONTRACT_RASCUNHO.md` diz que o backend precisa aprovar o contrato. **Rec
 |---|---|---|---|
 | **0 — Alinhamento (½ dia)** | Fechar o contrato e desbloquear o ambiente | Aprovar os DTOs do rascunho; decidir sync/async do MVP; subir stack local (Postgres + backend com chave Gemini válida); confirmar modelo Gemini | 19 |
 | **1 — Fatia vertical: upload → resumo** | Primeiro fluxo real ponta a ponta | `Documento` + persistência; `POST /api/documentos`; `GET …/{id}` e `GET …/{id}/analise` com mapeamento; `http.ts` lendo `ProblemDetail`; timeout ajustado; testar com `VITE_DATA_SOURCE=api` | 3, 4, 5, 7, 18 |
-| **2 — Documentos persistidos** | Tela inicial e listas com dados reais | ~~`GET /api/documentos`; `visualStatus`/`description`~~ (feitos na Fase 1); categorização via Gemini | 8 |
+| **2 — Documentos persistidos** | Tela inicial e listas com dados reais | ~~`GET /api/documentos`; `visualStatus`/`description`~~ (feitos na Fase 1); ~~categorização via Gemini~~ (feita) | 6, 8 |
 | **3 — Chat** | Perguntas sobre o contrato | Método de conversa no `GeminiService`; entidade `MensagemChat`; `POST/GET …/chat/mensagens`; validar o comportamento de `ChatPage` em modo API | 9, 10 |
 | **4 — Perfil e personalização** | Preferências valem de verdade | `GET/PATCH /api/perfil`; injeção de `explainLevel`/`income` no prompt. *Sem auth, é um perfil global — só para demo.* | 11, 12 |
 | **5 — Conta e privacidade** | Pré-requisito para dados reais de pessoas | Spring Security, `Usuario`, `usuarioId` em tudo, 401/403, UI de login, `DELETE` de documento (+ botão), exclusão de conta, política LGPD. **Não publicar com dados reais antes desta fase.** | 13, 14, 17 |
@@ -291,11 +291,30 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 - **Dados de teste:** os 3 documentos enviados nos testes (`foto.jpg`, `digital.pdf`, `imagem.png`) ficaram no Postgres local. Ainda não há endpoint de exclusão (Fase 5).
 - **Estado do repositório:** a pasta `frontend/src/node_modules` (cópia solta de dependências, 138 MB, ignorada pelo git) duplicava o React e quebrava 17 testes localmente; foi movida para fora do projeto. `frontend/src/dist` (build antigo) faz o `npm run lint` acusar 981 erros localmente; o CI não é afetado porque parte de um checkout limpo.
 
-### Fase 2 — Documentos persistidos
+### Fase 2 — Documentos persistidos (executada em 2026-10-30)
 - [x] `GET /api/documentos` ordenado por data (feito na Fase 1)
 - [x] Devolver `visualStatus` e `description` (feito na Fase 1: `warning` se há pontos de atenção; descrição = 1ª frase do resumo)
-- [ ] Pedir `categoria` ao Gemini e persistir em `categoryId` (hoje só vale a categoria que o frontend envia; sem ela o documento aparece em "Outros")
-- [ ] Conferir Home, Categoria e Todos os Documentos com dados reais (Home verificada na Fase 1; faltam Categoria e Todos os Documentos)
+- [x] Categorização por IA: `ServicoDeIA.classificar` (segunda chamada ao Gemini, escolhida pelo usuário em vez da mesma chamada da análise); só roda quando o upload não traz `categoryId`; a escolha do usuário sempre vale mais
+- [x] Resposta da IA fora das 5 chaves, vazia, ou falha na classificação → grava `Outros` (o upload já analisado não é perdido); maiúsculas e espaços são normalizados
+- [x] `Categorias` é a única fonte da lista no backend (chaves + descrições dadas à IA); `CategoriasTest` avisa que a lista tem de acompanhar `frontend/src/styles/categories.ts`
+- [x] Prompt endurecido: só fatos do texto, sem comparar com mercado/lei, sem julgar valores, números duvidosos do OCR copiados sem correção
+- [x] Conferir Home, Categoria e Todos os Documentos com dados reais (navegador automatizado)
+
+**Resultados medidos** (backend no Docker, `gemini-3.5-flash-lite`, contratos fictícios em PDF digital):
+
+| Verificação | Resultado |
+|---|---|
+| `mvn verify` | 33 testes, `BUILD SUCCESS` |
+| Classificação sem `categoryId`: carro / trabalho / banco / viagem / aluguel | `Carros` / `Trabalho` / `Banco` / `Outros` / `Casa`, as 5 certas |
+| Tempo do upload já com a classificação | 2,2 a 2,6 s (uma vez 6,0 s) |
+| Contrato de carro enviado com `categoryId=Banco` | fica em `Banco` (a escolha do usuário prevalece) |
+| Prompt: busca por "mercado", "abusivo", "alto", "recomend..." etc. em 7 análises | 0 ocorrências (a comparação inventada da Fase 1 não voltou) |
+| Navegador: Home | contadores por categoria batem com o banco |
+| Navegador: `/categorias/Carros`, `/categorias/Banco`, `/documentos`, filtro "atenção", busca "carro" | listas corretas; Banco mostra o carro (escolha do usuário) e o contrato de banco; 0 erros de JavaScript |
+
+- **Ressalvas:** só 5 contratos de categorias diferentes e curtos, 1 execução cada; a classificação de contratos reais, longos ou ambíguos (ex.: seguro de carro, financiamento de imóvel pelo banco) **não foi avaliada**. A checagem do prompt é uma busca por palavras em 7 análises, não prova que a IA nunca inventará.
+- **Documentos antigos não foram reclassificados:** os enviados na Fase 1 ficaram com `categoryId` nulo e aparecem em "Outros".
+- **A classificação soma uma chamada ao Gemini por upload** (decisão do usuário); se o tempo ou os 503 incomodarem, dá para fundi-la à chamada da análise.
 
 ### Fase 3 — Chat
 - [ ] `GeminiService`: método de conversa (texto livre) com texto do contrato + histórico + pergunta
