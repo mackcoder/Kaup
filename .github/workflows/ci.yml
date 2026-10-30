@@ -73,8 +73,20 @@ jobs:
           docker compose logs backend --tail 100
           exit 1
 
-      - name: Conferir que a tabela analise foi criada
-        run: docker compose exec -T postgres psql -U usuario_app -d gestao_contratos -c "\dt" | grep analise
+      - name: Conferir que a tabela documento foi criada
+        run: docker compose exec -T postgres psql -U usuario_app -d gestao_contratos -c "\dt" | grep documento
+
+      - name: Listagem de documentos deve responder com lista vazia
+        run: |
+          resposta=$(curl -fsS http://localhost:8080/api/documentos)
+          echo "$resposta"
+          test "$resposta" = "[]"
+
+      - name: Documento inexistente deve retornar 404
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/documentos/nao-existe)
+          echo "HTTP $code"
+          test "$code" = "404"
 
       - name: Texto vazio deve retornar 400
         run: |

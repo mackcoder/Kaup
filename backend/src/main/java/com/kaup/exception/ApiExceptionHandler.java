@@ -15,6 +15,11 @@ public class ApiExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
+    @ExceptionHandler(DocumentoNaoEncontradoException.class)
+    public ProblemDetail documentoNaoEncontrado(DocumentoNaoEncontradoException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ProblemDetail arquivoGrande(MaxUploadSizeExceededException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE,
