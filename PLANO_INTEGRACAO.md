@@ -406,6 +406,12 @@ Decisões do usuário: login por **e-mail e senha**; sessão em **cookie guardad
 - **Poucas combinações testadas:** um usuário comum, o administrador e dois usuários em paralelo; nada de carga ou de concorrência real.
 - **O campo `audio` do perfil** só é guardado: não há narração (Fase 6).
 
+**Ajuste posterior (2026-10-30): chat mais acolhedor e renda fora do histórico.** Num uso real, "Qual é minha renda mensal?" foi respondido com "o contrato não fala nada sobre a sua renda" e o bot ainda admitiu que sabia a faixa mas não a disse (as regras "responda só com base no contrato" e "não repita a renda" estavam duras demais).
+- O prompt do chat passou a pedir tom acolhedor; a responder perguntas **sobre a pessoa** com o que ela informou (ou a dizer com naturalidade que não tem a informação); a explicar conceitos gerais avisando que não são do contrato; a aceitar conversa leve; e a recusar com gentileza o que não tem relação com contratos (programar, poemas, lição de casa), voltando ao assunto. A renda só é mencionada quando a pergunta é sobre ela ou sobre orçamento.
+- **Falha de privacidade achada no teste:** com a renda **bloqueada**, o chat ainda respondia a faixa, porque as respostas anteriores (geradas com a renda liberada) ficavam no histórico reenviado ao Gemini. Agora cada resposta da IA lembra se foi gerada com a renda (`MensagemChat.comRenda`) e, com o envio bloqueado, essas respostas e as perguntas delas saem do histórico enviado. O que a própria pessoa digita continua valendo; mensagens anteriores à coluna contam como sem renda.
+- Verificado com o Gemini de verdade: renda liberada responde a faixa e **não** a traz em perguntas sem relação (alienação fiduciária, valor da entrada); "oi, tudo bem?" é cumprimentado com simpatia; "hello world em Python", poesia e lição de matemática são recusados com gentileza; renda bloqueada → "não tenho essa informação", usa a renda digitada na conversa e **0** citações da faixa antiga depois do bloqueio. Backend: 111 testes passando.
+- **Ressalva:** poucas conversas testadas e o comportamento de um modelo de linguagem varia de uma execução para outra; vale uma revisão humana de conversas reais.
+
 ### Fase 5 — Privacidade (parte feita junto com a Fase 4)
 - [x] Spring Security, `Usuario`, dono nos documentos, checagem de dono em todo acesso por id
 - [x] Telas de cadastro e login, credenciais (cookie) no `http.ts`, tratamento de 401
