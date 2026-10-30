@@ -1,6 +1,7 @@
 package com.kaup.controller;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -18,17 +19,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.kaup.dto.MensagemChatResponse;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.exception.ServicoExternoException;
+import com.kaup.security.WithUsuarioLogado;
 import com.kaup.service.ChatService;
 
 @WebMvcTest(ChatController.class)
-@WithMockUser
+@WithUsuarioLogado
 class ChatControllerTest {
 
     private static final String ID = "3f2a9c1e-5b7d-4c8a-9e0f-1a2b3c4d5e6f";
@@ -46,7 +47,7 @@ class ChatControllerTest {
 
     @Test
     void perguntaRetorna201ComARespostaNoFormatoQueOFrontendValida() throws Exception {
-        when(chatService.perguntar(ID, "Qual é a multa?")).thenReturn(mensagem("7", "assistant", "10%."));
+        when(chatService.perguntar(eq(ID), eq("Qual é a multa?"), any())).thenReturn(mensagem("7", "assistant", "10%."));
 
         mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Qual é a multa?\"}"))
                 .andExpect(status().isCreated())
@@ -56,12 +57,12 @@ class ChatControllerTest {
                 .andExpect(jsonPath("$.content").value("10%."))
                 .andExpect(jsonPath("$.createdAt").value("2026-10-30T12:00:00Z"));
 
-        verify(chatService).perguntar(eq(ID), eq("Qual é a multa?"));
+        verify(chatService).perguntar(eq(ID), eq("Qual é a multa?"), any());
     }
 
     @Test
     void perguntaInvalidaRetorna400ComMensagemEmPortugues() throws Exception {
-        when(chatService.perguntar(ID, " ")).thenThrow(new ContratoInvalidoException("Digite uma pergunta."));
+        when(chatService.perguntar(eq(ID), eq(" "), any())).thenThrow(new ContratoInvalidoException("Digite uma pergunta."));
 
         mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\" \"}"))
                 .andExpect(status().isBadRequest())
@@ -76,7 +77,7 @@ class ChatControllerTest {
 
     @Test
     void falhaDaIaRetorna502() throws Exception {
-        when(chatService.perguntar(ID, "oi")).thenThrow(new ServicoExternoException("IA (Gemini)", null));
+        when(chatService.perguntar(eq(ID), eq("oi"), any())).thenThrow(new ServicoExternoException("IA (Gemini)", null));
 
         mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oi\"}"))
                 .andExpect(status().isBadGateway());
@@ -84,8 +85,8 @@ class ChatControllerTest {
 
     @Test
     void documentoInexistenteRetorna404() throws Exception {
-        when(chatService.perguntar(ID, "oi")).thenThrow(new DocumentoNaoEncontradoException());
-        when(chatService.historico(ID)).thenThrow(new DocumentoNaoEncontradoException());
+        when(chatService.perguntar(eq(ID), eq("oi"), any())).thenThrow(new DocumentoNaoEncontradoException());
+        when(chatService.historico(eq(ID), any())).thenThrow(new DocumentoNaoEncontradoException());
 
         mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oi\"}"))
                 .andExpect(status().isNotFound());
@@ -94,7 +95,7 @@ class ChatControllerTest {
 
     @Test
     void historicoDevolveAsDuasPontasDaConversa() throws Exception {
-        when(chatService.historico(ID)).thenReturn(List.of(
+        when(chatService.historico(eq(ID), any())).thenReturn(List.of(
                 mensagem("1", "user", "Qual é a multa?"),
                 mensagem("2", "assistant", "10%.")));
 

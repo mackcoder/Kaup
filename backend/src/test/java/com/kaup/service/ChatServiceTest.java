@@ -24,11 +24,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.kaup.dto.MensagemChatResponse;
 import com.kaup.entity.Documento;
+import com.kaup.entity.Papel;
 import com.kaup.entity.MensagemChat;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.MensagemChatRepository;
+import com.kaup.security.UsuarioLogado;
 
 class ChatServiceTest {
 
@@ -38,6 +40,7 @@ class ChatServiceTest {
     private ServicoDeIA servicoDeIA;
     private ChatService service;
     private Documento documento;
+    private final UsuarioLogado usuario = new UsuarioLogado(UUID.randomUUID(), "ana@exemplo.com", Papel.USER, null);
 
     @BeforeEach
     void preparar() {
@@ -49,7 +52,8 @@ class ChatServiceTest {
         documento = new Documento();
         ReflectionTestUtils.setField(documento, "id", documentoId);
         documento.setTextoExtraido("texto do contrato");
-        when(documentoService.obter(documentoId.toString())).thenReturn(documento);
+        when(documentoService.obterDoDono(eq(documentoId.toString()), any())).thenReturn(documento);
+        when(documentoService.obterParaLeitura(eq(documentoId.toString()), any())).thenReturn(documento);
 
         when(repository.findByDocumentoIdOrderByIdDesc(eq(documentoId), any(Pageable.class))).thenReturn(List.of());
         when(servicoDeIA.conversar(anyString(), anyList(), anyString())).thenReturn("  A multa é de 10%.  ");
@@ -76,7 +80,7 @@ class ChatServiceTest {
     @Test
     @SuppressWarnings("unchecked") // o captor de List<...> é inevitavelmente genérico
     void respondeComOContratoEGravaPerguntaERespostaJuntas() {
-        MensagemChatResponse resposta = service.perguntar(documentoId.toString(), "  Qual é a multa?  ");
+        MensagemChatResponse resposta = service.perguntar(documentoId.toString(), "  Qual é a multa?  ", usuario);
 
         verify(servicoDeIA).conversar("texto do contrato", List.of(), "Qual é a multa?");
 
@@ -103,7 +107,7 @@ class ChatServiceTest {
                 mensagem(2, "assistant", "resposta 1"),
                 mensagem(1, "user", "pergunta 1")));
 
-        service.perguntar(documentoId.toString(), "pergunta 3");
+        service.perguntar(documentoId.toString(), "pergunta 3", usuario);
 
         verify(servicoDeIA).conversar("texto do contrato", List.of(
                 new TurnoDeConversa("user", "pergunta 1"),
@@ -114,7 +118,7 @@ class ChatServiceTest {
 
     @Test
     void pedeAoBancoSoAsDezMensagensMaisRecentes() {
-        service.perguntar(documentoId.toString(), "oi");
+        service.perguntar(documentoId.toString(), "oi", usuario);
 
         ArgumentCaptor<Pageable> limite = ArgumentCaptor.forClass(Pageable.class);
         verify(repository).findByDocumentoIdOrderByIdDesc(eq(documentoId), limite.capture());
@@ -124,8 +128,8 @@ class ChatServiceTest {
 
     @Test
     void perguntaEmBrancoOuNulaEhRecusadaAntesDeChamarAIa() {
-        assertThrows(ContratoInvalidoException.class, () -> service.perguntar(documentoId.toString(), "   "));
-        assertThrows(ContratoInvalidoException.class, () -> service.perguntar(documentoId.toString(), null));
+        assertThrows(ContratoInvalidoException.class, () -> service.perguntar(documentoId.toString(), "   ", usuario));
+        assertThrows(ContratoInvalidoException.class, () -> service.perguntar(documentoId.toString(), null, usuario));
 
         verifyNoInteractions(servicoDeIA);
         verify(repository, never()).saveAll(anyList());
@@ -134,9 +138,9 @@ class ChatServiceTest {
     @Test
     void perguntaAcimaDe2000CaracteresEhRecusada() {
         assertThrows(ContratoInvalidoException.class,
-                () -> service.perguntar(documentoId.toString(), "a".repeat(2001)));
+                () -> service.perguntar(documentoId.toString(), "a".repeat(2001), usuario));
 
-        service.perguntar(documentoId.toString(), "a".repeat(2000)); // exatamente no limite passa
+        service.perguntar(documentoId.toString(), "a".repeat(2000), usuario); // exatamente no limite passa
     }
 
     @Test
@@ -144,7 +148,7 @@ class ChatServiceTest {
         when(servicoDeIA.conversar(anyString(), anyList(), anyString()))
                 .thenThrow(new ServicoExternoException("IA (Gemini)", null));
 
-        assertThrows(ServicoExternoException.class, () -> service.perguntar(documentoId.toString(), "oi"));
+        assertThrows(ServicoExternoException.class, () -> service.perguntar(documentoId.toString(), "oi", usuario));
 
         verify(repository, never()).saveAll(anyList());
     }
@@ -153,17 +157,18 @@ class ChatServiceTest {
     void respostaVaziaDaIaContaComoFalhaENaoGravaNada() {
         when(servicoDeIA.conversar(anyString(), anyList(), anyString())).thenReturn("   ");
 
-        assertThrows(ServicoExternoException.class, () -> service.perguntar(documentoId.toString(), "oi"));
+        assertThrows(ServicoExternoException.class, () -> service.perguntar(documentoId.toString(), "oi", usuario));
 
         verify(repository, never()).saveAll(anyList());
     }
 
     @Test
     void documentoInexistenteLancaNaoEncontradoSemChamarAIa() {
-        when(documentoService.obter("nao-existe")).thenThrow(new DocumentoNaoEncontradoException());
+        when(documentoService.obterDoDono(eq("nao-existe"), any())).thenThrow(new DocumentoNaoEncontradoException());
+        when(documentoService.obterParaLeitura(eq("nao-existe"), any())).thenThrow(new DocumentoNaoEncontradoException());
 
-        assertThrows(DocumentoNaoEncontradoException.class, () -> service.perguntar("nao-existe", "oi"));
-        assertThrows(DocumentoNaoEncontradoException.class, () -> service.historico("nao-existe"));
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.perguntar("nao-existe", "oi", usuario));
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.historico("nao-existe", usuario));
 
         verifyNoInteractions(servicoDeIA);
     }
@@ -174,7 +179,7 @@ class ChatServiceTest {
                 mensagem(1, "user", "Qual é a multa?"),
                 mensagem(2, "assistant", "10%.")));
 
-        List<MensagemChatResponse> historico = service.historico(documentoId.toString());
+        List<MensagemChatResponse> historico = service.historico(documentoId.toString(), usuario);
 
         assertEquals(2, historico.size());
         assertEquals("user", historico.get(0).role());

@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,10 +25,15 @@ import com.kaup.dto.AnaliseContratoResponse;
 import com.kaup.dto.AnaliseResponse;
 import com.kaup.dto.DocumentoResponse;
 import com.kaup.entity.Documento;
+import com.kaup.entity.Papel;
+import com.kaup.entity.Usuario;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.DocumentoRepository;
+import com.kaup.repository.UsuarioRepository;
+import com.kaup.security.UsuarioLogado;
+import com.kaup.exception.OperacaoNaoPermitidaException;
 
 class DocumentoServiceTest {
 
@@ -35,6 +41,9 @@ class DocumentoServiceTest {
     private AnaliseService analiseService;
     private ServicoDeIA servicoDeIA;
     private DocumentoRepository repository;
+    private UsuarioRepository usuarios;
+    private final UsuarioLogado usuario = new UsuarioLogado(UUID.randomUUID(), "ana@exemplo.com", Papel.USER, null);
+    private final UsuarioLogado admin = new UsuarioLogado(UUID.randomUUID(), "admin@admin", Papel.ADMIN, null);
     private DocumentoService service;
 
     @BeforeEach
@@ -42,7 +51,8 @@ class DocumentoServiceTest {
         analiseService = mock(AnaliseService.class);
         servicoDeIA = mock(ServicoDeIA.class);
         repository = mock(DocumentoRepository.class);
-        service = new DocumentoService(analiseService, servicoDeIA, repository, mapper);
+        usuarios = mock(UsuarioRepository.class);
+        service = new DocumentoService(analiseService, servicoDeIA, repository, usuarios, mapper);
         // Simula o banco: save devolve a mesma entidade, já com id.
         when(repository.save(any(Documento.class))).thenAnswer(invocacao -> {
             Documento documento = invocacao.getArgument(0);
@@ -67,7 +77,7 @@ class DocumentoServiceTest {
         MockMultipartFile contrato = arquivo("contrato.pdf");
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
 
-        DocumentoResponse resposta = service.criar(contrato, "Casa");
+        DocumentoResponse resposta = service.criar(contrato, "Casa", usuario);
 
         ArgumentCaptor<Documento> salvo = ArgumentCaptor.forClass(Documento.class);
         verify(repository).save(salvo.capture());
@@ -83,7 +93,7 @@ class DocumentoServiceTest {
 
     @Test
     void categoriaInvalidaFalhaAntesDoOcrENaoSalva() {
-        assertThrows(ContratoInvalidoException.class, () -> service.criar(arquivo("c.pdf"), "Inexistente"));
+        assertThrows(ContratoInvalidoException.class, () -> service.criar(arquivo("c.pdf"), "Inexistente", usuario));
 
         verifyNoInteractions(analiseService);
         verify(repository, never()).save(any());
@@ -94,7 +104,7 @@ class DocumentoServiceTest {
         MockMultipartFile contrato = arquivo("contrato.pdf");
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
 
-        assertEquals("Carros", service.criar(contrato, "Carros").categoryId());
+        assertEquals("Carros", service.criar(contrato, "Carros", usuario).categoryId());
 
         verifyNoInteractions(servicoDeIA);
     }
@@ -105,8 +115,8 @@ class DocumentoServiceTest {
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenReturn("Casa");
 
-        assertEquals("Casa", service.criar(contrato, null).categoryId());
-        assertEquals("Casa", service.criar(contrato, "  ").categoryId()); // em branco = sem categoria
+        assertEquals("Casa", service.criar(contrato, null, usuario).categoryId());
+        assertEquals("Casa", service.criar(contrato, "  ", usuario).categoryId()); // em branco = sem categoria
     }
 
     @Test
@@ -115,7 +125,7 @@ class DocumentoServiceTest {
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenReturn(" banco ");
 
-        assertEquals("Banco", service.criar(contrato, null).categoryId());
+        assertEquals("Banco", service.criar(contrato, null, usuario).categoryId());
     }
 
     @Test
@@ -124,10 +134,10 @@ class DocumentoServiceTest {
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
 
         when(servicoDeIA.classificar(any(), any())).thenReturn("Viagens");
-        assertEquals("Outros", service.criar(contrato, null).categoryId());
+        assertEquals("Outros", service.criar(contrato, null, usuario).categoryId());
 
         when(servicoDeIA.classificar(any(), any())).thenReturn("");
-        assertEquals("Outros", service.criar(contrato, null).categoryId());
+        assertEquals("Outros", service.criar(contrato, null, usuario).categoryId());
     }
 
     @Test
@@ -136,7 +146,7 @@ class DocumentoServiceTest {
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenThrow(new ServicoExternoException("IA (Gemini)", null));
 
-        DocumentoResponse resposta = service.criar(contrato, null);
+        DocumentoResponse resposta = service.criar(contrato, null, usuario);
 
         assertEquals("Outros", resposta.categoryId());
         verify(repository).save(any(Documento.class)); // o documento analisado não se perde
@@ -148,7 +158,7 @@ class DocumentoServiceTest {
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenReturn("Casa");
 
-        service.criar(contrato, null);
+        service.criar(contrato, null, usuario);
 
         verify(servicoDeIA).classificar("texto lido do contrato", Categorias.DESCRICOES);
     }
@@ -158,7 +168,7 @@ class DocumentoServiceTest {
         MockMultipartFile contrato = arquivo("contrato.pdf");
         when(analiseService.analisarArquivo(contrato)).thenThrow(new ContratoInvalidoException("ilegível"));
 
-        assertThrows(ContratoInvalidoException.class, () -> service.criar(contrato, null));
+        assertThrows(ContratoInvalidoException.class, () -> service.criar(contrato, null, usuario));
 
         verify(repository, never()).save(any());
     }
@@ -168,12 +178,12 @@ class DocumentoServiceTest {
         MockMultipartFile contrato = arquivo("C:\\Users\\fulano\\contrato.pdf");
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
 
-        assertEquals("contrato.pdf", service.criar(contrato, null).name());
+        assertEquals("contrato.pdf", service.criar(contrato, null, usuario).name());
     }
 
     @Test
     void idQueNaoEUuidEhTratadoComoNaoEncontrado() {
-        assertThrows(DocumentoNaoEncontradoException.class, () -> service.buscar("abc"));
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.buscar("abc", usuario));
 
         verifyNoInteractions(repository);
     }
@@ -183,7 +193,7 @@ class DocumentoServiceTest {
         UUID id = UUID.randomUUID();
         when(repository.findById(id)).thenReturn(Optional.empty());
 
-        assertThrows(DocumentoNaoEncontradoException.class, () -> service.analise(id.toString()));
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.analise(id.toString(), usuario));
     }
 
     @Test
@@ -192,10 +202,11 @@ class DocumentoServiceTest {
         Documento documento = new Documento();
         ReflectionTestUtils.setField(documento, "id", id);
         documento.setProcessingStatus("completed");
+        ReflectionTestUtils.setField(documento, "donoId", usuario.id());
         documento.setAnaliseJson(resultado().analise().toString());
         when(repository.findById(id)).thenReturn(Optional.of(documento));
 
-        AnaliseResponse analise = service.analise(id.toString());
+        AnaliseResponse analise = service.analise(id.toString(), usuario);
 
         assertEquals(id.toString(), analise.documentId());
         assertEquals("Contrato de aluguel. Define o valor.", analise.summary());
@@ -209,12 +220,102 @@ class DocumentoServiceTest {
         Documento documento = new Documento();
         ReflectionTestUtils.setField(documento, "id", id);
         documento.setProcessingStatus("completed");
+        ReflectionTestUtils.setField(documento, "donoId", usuario.id());
         documento.setAnaliseJson("{isto não é json");
         when(repository.findById(id)).thenReturn(Optional.of(documento));
 
-        AnaliseResponse analise = service.analise(id.toString());
+        AnaliseResponse analise = service.analise(id.toString(), usuario);
 
         assertNull(analise.summary());
         assertEquals(0, analise.keyPoints().size());
+    }
+
+    // ---- quem pode ver e alterar ----
+
+    private Documento documentoDe(UUID dono) {
+        Documento documento = new Documento();
+        ReflectionTestUtils.setField(documento, "id", UUID.randomUUID());
+        ReflectionTestUtils.setField(documento, "donoId", dono);
+        documento.setProcessingStatus("completed");
+        documento.setAnaliseJson("{}");
+        when(repository.findById(documento.getId())).thenReturn(Optional.of(documento));
+        return documento;
+    }
+
+    @Test
+    void documentoCriadoPertenceAQuemEnviou() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        Usuario referencia = new Usuario();
+        when(usuarios.getReferenceById(usuario.id())).thenReturn(referencia);
+
+        service.criar(contrato, "Casa", usuario);
+
+        ArgumentCaptor<Documento> salvo = ArgumentCaptor.forClass(Documento.class);
+        verify(repository).save(salvo.capture());
+        assertEquals(referencia, salvo.getValue().getDono());
+    }
+
+    @Test
+    void usuarioComumListaSoOsProprios() {
+        Documento meu = documentoDe(usuario.id());
+        when(repository.findByDonoIdOrderByCriadoEmDesc(usuario.id())).thenReturn(List.of(meu));
+
+        List<DocumentoResponse> lista = service.listar(usuario);
+
+        assertEquals(1, lista.size());
+        verify(repository, never()).findAllByOrderByCriadoEmDesc();
+    }
+
+    @Test
+    void administradorListaOsDocumentosDeTodos() {
+        Documento deUm = documentoDe(UUID.randomUUID());
+        Documento deOutro = documentoDe(UUID.randomUUID());
+        when(repository.findAllByOrderByCriadoEmDesc()).thenReturn(List.of(deUm, deOutro));
+
+        assertEquals(2, service.listar(admin).size());
+        verify(repository, never()).findByDonoIdOrderByCriadoEmDesc(any());
+    }
+
+    @Test
+    void documentoDeOutraPessoaParaUsuarioComumNaoExiste() {
+        Documento alheio = documentoDe(UUID.randomUUID());
+
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.buscar(alheio.getId().toString(), usuario));
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.analise(alheio.getId().toString(), usuario));
+    }
+
+    @Test
+    void documentoSemDonoNaoApareceParaUsuarioComum() {
+        Documento orfao = documentoDe(null);
+
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.buscar(orfao.getId().toString(), usuario));
+    }
+
+    @Test
+    void administradorLeDocumentoDeOutraPessoa() {
+        Documento alheio = documentoDe(UUID.randomUUID());
+
+        assertEquals(alheio.getId().toString(), service.buscar(alheio.getId().toString(), admin).id());
+    }
+
+    @Test
+    void donoApagaOProprioDocumento() {
+        Documento meu = documentoDe(usuario.id());
+
+        service.excluir(meu.getId().toString(), usuario);
+
+        verify(repository).delete(meu);
+    }
+
+    @Test
+    void ninguemApagaDocumentoAlheio() {
+        Documento alheio = documentoDe(UUID.randomUUID());
+
+        assertThrows(DocumentoNaoEncontradoException.class, () -> service.excluir(alheio.getId().toString(), usuario));
+        // O administrador lê tudo, mas não altera o que é dos outros, e fica sabendo por quê.
+        assertThrows(OperacaoNaoPermitidaException.class, () -> service.excluir(alheio.getId().toString(), admin));
+
+        verify(repository, never()).delete(any(Documento.class));
     }
 }

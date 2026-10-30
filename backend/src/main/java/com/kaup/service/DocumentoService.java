@@ -19,8 +19,11 @@ import com.kaup.dto.DocumentoResponse;
 import com.kaup.entity.Documento;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
+import com.kaup.exception.OperacaoNaoPermitidaException;
 import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.DocumentoRepository;
+import com.kaup.repository.UsuarioRepository;
+import com.kaup.security.UsuarioLogado;
 
 /** Cria e consulta documentos. Traduz entidade e JSON da IA para o formato do frontend. */
 @Service
@@ -35,13 +38,16 @@ public class DocumentoService {
     private final AnaliseService analiseService;
     private final ServicoDeIA servicoDeIA;
     private final DocumentoRepository repository;
+    private final UsuarioRepository usuarios;
     private final ObjectMapper objectMapper;
 
     public DocumentoService(AnaliseService analiseService, ServicoDeIA servicoDeIA,
-                            DocumentoRepository repository, ObjectMapper objectMapper) {
+                            DocumentoRepository repository, UsuarioRepository usuarios,
+                            ObjectMapper objectMapper) {
         this.analiseService = analiseService;
         this.servicoDeIA = servicoDeIA;
         this.repository = repository;
+        this.usuarios = usuarios;
         this.objectMapper = objectMapper;
     }
 
@@ -50,7 +56,8 @@ public class DocumentoService {
      * sobe e nada é salvo. Se o usuário não escolheu categoria, a IA classifica. Não é
      * transacional de propósito: a análise leva segundos e não deve segurar uma conexão do banco.
      */
-    public DocumentoResponse criar(MultipartFile arquivo, String categoryId) throws IOException {
+    public DocumentoResponse criar(MultipartFile arquivo, String categoryId, UsuarioLogado usuario)
+            throws IOException {
         String categoria = normalizarCategoria(categoryId); // falha cedo, antes do OCR e da IA
         AnaliseContratoResponse resultado = analiseService.analisarArquivo(arquivo);
         if (categoria == null) {
@@ -64,24 +71,27 @@ public class DocumentoService {
         documento.setProcessingStatus(STATUS_CONCLUIDO);
         documento.setTextoExtraido(resultado.textoExtraido());
         documento.setAnaliseJson(resultado.analise().toString());
+        documento.setDono(usuarios.getReferenceById(usuario.id()));
         return paraDocumentoResponse(repository.save(documento));
     }
 
+    /** O administrador vê os documentos de todos; as demais pessoas, só os próprios. */
     @Transactional(readOnly = true)
-    public List<DocumentoResponse> listar() {
-        return repository.findAllByOrderByCriadoEmDesc().stream()
-                .map(this::paraDocumentoResponse)
-                .toList();
+    public List<DocumentoResponse> listar(UsuarioLogado usuario) {
+        List<Documento> documentos = usuario.isAdmin()
+                ? repository.findAllByOrderByCriadoEmDesc()
+                : repository.findByDonoIdOrderByCriadoEmDesc(usuario.id());
+        return documentos.stream().map(this::paraDocumentoResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public DocumentoResponse buscar(String id) {
-        return paraDocumentoResponse(obter(id));
+    public DocumentoResponse buscar(String id, UsuarioLogado usuario) {
+        return paraDocumentoResponse(obterParaLeitura(id, usuario));
     }
 
     @Transactional(readOnly = true)
-    public AnaliseResponse analise(String id) {
-        Documento documento = obter(id);
+    public AnaliseResponse analise(String id, UsuarioLogado usuario) {
+        Documento documento = obterParaLeitura(id, usuario);
         JsonNode analise = lerAnalise(documento);
         return new AnaliseResponse(
                 documento.getId().toString(),
@@ -91,8 +101,44 @@ public class DocumentoService {
                 null);
     }
 
-    // Visível ao pacote: o chat também precisa achar um documento pelo id da URL.
-    Documento obter(String id) {
+    /** Apaga o documento; a conversa dele some junto, pela cascata do banco. Só o dono apaga. */
+    public void excluir(String id, UsuarioLogado usuario) {
+        repository.delete(obterDoDono(id, usuario));
+    }
+
+    // Os dois métodos abaixo são visíveis ao pacote: o chat também precisa achar um documento
+    // pelo id da URL, com a mesma regra de quem pode ver.
+
+    /** Quem pode ler: o dono e o administrador. Para os demais o documento "não existe" (404). */
+    Documento obterParaLeitura(String id, UsuarioLogado usuario) {
+        Documento documento = buscarPorId(id);
+        if (!usuario.isAdmin() && !ehDono(documento, usuario)) {
+            throw new DocumentoNaoEncontradoException();
+        }
+        return documento;
+    }
+
+    /**
+     * Quem pode alterar (perguntar no chat, apagar): só o dono. O administrador pode ler o
+     * documento de outra pessoa, mas não mexer nele, e recebe um 403 explicando isso.
+     */
+    Documento obterDoDono(String id, UsuarioLogado usuario) {
+        Documento documento = buscarPorId(id);
+        if (ehDono(documento, usuario)) {
+            return documento;
+        }
+        if (usuario.isAdmin()) {
+            throw new OperacaoNaoPermitidaException(
+                    "O administrador só pode consultar os documentos de outras pessoas, não alterá-los.");
+        }
+        throw new DocumentoNaoEncontradoException();
+    }
+
+    private boolean ehDono(Documento documento, UsuarioLogado usuario) {
+        return usuario.id().equals(documento.getDonoId());
+    }
+
+    private Documento buscarPorId(String id) {
         UUID uuid;
         try {
             uuid = UUID.fromString(id);

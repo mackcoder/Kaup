@@ -18,19 +18,22 @@ import com.kaup.entity.Papel;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
 import com.kaup.exception.EmailJaCadastradoException;
+import com.kaup.repository.DocumentoRepository;
 import com.kaup.repository.UsuarioRepository;
 
 class ContaServiceTest {
 
     private UsuarioRepository repository;
+    private DocumentoRepository documentos;
     private PasswordEncoder encoder;
     private ContaService service;
 
     @BeforeEach
     void preparar() {
         repository = mock(UsuarioRepository.class);
+        documentos = mock(DocumentoRepository.class);
         encoder = mock(PasswordEncoder.class);
-        service = new ContaService(repository, encoder);
+        service = new ContaService(repository, documentos, encoder);
         when(encoder.encode("senha1234")).thenReturn("hash-bcrypt");
         when(repository.save(any(Usuario.class))).thenAnswer(i -> i.getArgument(0));
     }
@@ -99,5 +102,23 @@ class ContaServiceTest {
                 () -> service.cadastrar(pedido("Ana", "ANA@exemplo.com", "senha1234", "senha1234")));
 
         verify(repository, never()).save(any());
+    }
+
+    @Test
+    void oPrimeiroUsuarioComumAdotaOsDocumentosSemDono() {
+        when(repository.countByPapel(Papel.USER)).thenReturn(1L); // só ele existe
+
+        Usuario criado = service.cadastrar(pedido("Ana", "ana@exemplo.com", "senha1234", "senha1234"));
+
+        verify(documentos).atribuirSemDono(criado);
+    }
+
+    @Test
+    void osProximosUsuariosNaoAdotamNada() {
+        when(repository.countByPapel(Papel.USER)).thenReturn(2L);
+
+        service.cadastrar(pedido("Bia", "bia@exemplo.com", "senha1234", "senha1234"));
+
+        verify(documentos, never()).atribuirSemDono(any());
     }
 }

@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kaup.dto.MensagemChatResponse;
 import com.kaup.dto.PerguntaRequest;
+import com.kaup.security.UsuarioLogado;
 import com.kaup.service.ChatService;
 
 /** Chat sobre um documento (ver frontend/src/services/api/endpoints.ts). */
@@ -29,14 +31,15 @@ public class ChatController {
 
     /** Conversa completa, da mensagem mais antiga para a mais recente. */
     @GetMapping
-    public List<MensagemChatResponse> historico(@PathVariable String id) {
-        return chatService.historico(id);
+    public List<MensagemChatResponse> historico(@PathVariable String id, @AuthenticationPrincipal UsuarioLogado usuario) {
+        return chatService.historico(id, usuario);
     }
 
     /** Recebe a pergunta e devolve só a resposta da IA; a pergunta fica no histórico. */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public MensagemChatResponse perguntar(@PathVariable String id, @RequestBody PerguntaRequest pergunta) {
-        return chatService.perguntar(id, pergunta.message());
+    public MensagemChatResponse perguntar(@PathVariable String id, @RequestBody PerguntaRequest pergunta,
+                                          @AuthenticationPrincipal UsuarioLogado usuario) {
+        return chatService.perguntar(id, pergunta.message(), usuario);
     }
 }

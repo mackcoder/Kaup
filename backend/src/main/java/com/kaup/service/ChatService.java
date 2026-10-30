@@ -14,6 +14,7 @@ import com.kaup.entity.MensagemChat;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.MensagemChatRepository;
+import com.kaup.security.UsuarioLogado;
 
 /** Chat sobre um documento: pergunta do usuário, resposta da IA e histórico. */
 @Service
@@ -42,9 +43,9 @@ public class ChatService {
      * Não é transacional de propósito: a chamada à IA leva segundos e não deve segurar uma
      * conexão do banco.
      */
-    public MensagemChatResponse perguntar(String documentoId, String pergunta) {
+    public MensagemChatResponse perguntar(String documentoId, String pergunta, UsuarioLogado usuario) {
         String texto = validar(pergunta);
-        Documento documento = documentoService.obter(documentoId); // 404 se não existe
+        Documento documento = documentoService.obterDoDono(documentoId, usuario); // 404 se não é seu
 
         List<MensagemChat> recentes = new ArrayList<>(
                 repository.findByDocumentoIdOrderByIdDesc(documento.getId(), PageRequest.of(0, HISTORICO_MAX)));
@@ -65,8 +66,8 @@ public class ChatService {
     }
 
     @Transactional(readOnly = true)
-    public List<MensagemChatResponse> historico(String documentoId) {
-        Documento documento = documentoService.obter(documentoId);
+    public List<MensagemChatResponse> historico(String documentoId, UsuarioLogado usuario) {
+        Documento documento = documentoService.obterParaLeitura(documentoId, usuario);
         return repository.findByDocumentoIdOrderByIdAsc(documento.getId()).stream()
                 .map(m -> paraResponse(m, documento))
                 .toList();

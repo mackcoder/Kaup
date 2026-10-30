@@ -13,6 +13,7 @@ import com.kaup.entity.Papel;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
 import com.kaup.exception.EmailJaCadastradoException;
+import com.kaup.repository.DocumentoRepository;
 import com.kaup.repository.UsuarioRepository;
 
 /** Cadastro e consulta de contas. */
@@ -29,10 +30,12 @@ public class ContaService {
     static final int EMAIL_MAX = 254;
 
     private final UsuarioRepository repository;
+    private final DocumentoRepository documentos;
     private final PasswordEncoder encoder;
 
-    public ContaService(UsuarioRepository repository, PasswordEncoder encoder) {
+    public ContaService(UsuarioRepository repository, DocumentoRepository documentos, PasswordEncoder encoder) {
         this.repository = repository;
+        this.documentos = documentos;
         this.encoder = encoder;
     }
 
@@ -50,7 +53,14 @@ public class ContaService {
         usuario.setEmail(email);
         usuario.setSenhaHash(encoder.encode(pedido.password()));
         usuario.setPapel(Papel.USER);
-        return repository.save(usuario);
+        Usuario criado = repository.save(usuario);
+
+        // Documentos de antes das contas não têm dono: o primeiro usuário comum a se cadastrar
+        // fica com eles. O administrador não conta, pois já enxerga todos.
+        if (repository.countByPapel(Papel.USER) == 1) {
+            documentos.atribuirSemDono(criado);
+        }
+        return criado;
     }
 
     @Transactional(readOnly = true)

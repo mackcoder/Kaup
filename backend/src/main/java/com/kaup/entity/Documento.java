@@ -4,11 +4,17 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 
 /**
  * Contrato enviado pelo usuário. Guarda só o texto extraído e a análise da IA;
@@ -32,10 +38,17 @@ public class Documento {
     private String processingStatus;
 
     /**
-     * Dono do documento. Fica nulo até existir autenticação; já existe para que a conta
-     * entre sem mudar a tabela. Nada o preenche nem filtra por ele ainda.
+     * Dono do documento. Fica nulo só nos documentos criados antes das contas, até o primeiro
+     * usuário se cadastrar e adotá-los. Apagar a conta apaga os documentos (no próprio banco).
      */
-    private String usuarioId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dono_id")
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Usuario dono;
+
+    // A mesma coluna, só para leitura: dá o id do dono sem carregar (nem tocar no proxy de) Usuario.
+    @Column(name = "dono_id", insertable = false, updatable = false)
+    private UUID donoId;
 
     @Column(columnDefinition = "TEXT")
     private String textoExtraido;
@@ -55,8 +68,9 @@ public class Documento {
     public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
     public String getProcessingStatus() { return processingStatus; }
     public void setProcessingStatus(String processingStatus) { this.processingStatus = processingStatus; }
-    public String getUsuarioId() { return usuarioId; }
-    public void setUsuarioId(String usuarioId) { this.usuarioId = usuarioId; }
+    public Usuario getDono() { return dono; }
+    public void setDono(Usuario dono) { this.dono = dono; }
+    public UUID getDonoId() { return donoId; }
     public String getTextoExtraido() { return textoExtraido; }
     public void setTextoExtraido(String textoExtraido) { this.textoExtraido = textoExtraido; }
     public String getAnaliseJson() { return analiseJson; }
