@@ -5,7 +5,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -115,20 +114,5 @@ class DocumentoControllerTest {
                 .andExpect(jsonPath("$.summary").value("Resumo."))
                 .andExpect(jsonPath("$.keyPoints[0].severity").value("info"))
                 .andExpect(jsonPath("$", hasKey("ocrQualityWarning")));
-    }
-
-    @Test
-    void historicoDoChatAindaEhListaVazia() throws Exception {
-        mockMvc.perform(get("/api/documentos/" + ID + "/chat/mensagens"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
-    }
-
-    @Test
-    void historicoDoChatDeDocumentoInexistenteRetorna404() throws Exception {
-        doThrow(new DocumentoNaoEncontradoException()).when(documentoService).verificarExiste(ID);
-
-        mockMvc.perform(get("/api/documentos/" + ID + "/chat/mensagens"))
-                .andExpect(status().isNotFound());
     }
 }

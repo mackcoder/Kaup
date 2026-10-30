@@ -31,6 +31,12 @@ public class Documento {
     /** pending, processing, completed ou failed (hoje o fluxo é síncrono: sempre completed). */
     private String processingStatus;
 
+    /**
+     * Dono do documento. Fica nulo até existir autenticação; já existe para que a conta
+     * entre sem mudar a tabela. Nada o preenche nem filtra por ele ainda.
+     */
+    private String usuarioId;
+
     @Column(columnDefinition = "TEXT")
     private String textoExtraido;
 
@@ -49,6 +55,8 @@ public class Documento {
     public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
     public String getProcessingStatus() { return processingStatus; }
     public void setProcessingStatus(String processingStatus) { this.processingStatus = processingStatus; }
+    public String getUsuarioId() { return usuarioId; }
+    public void setUsuarioId(String usuarioId) { this.usuarioId = usuarioId; }
     public String getTextoExtraido() { return textoExtraido; }
     public void setTextoExtraido(String textoExtraido) { this.textoExtraido = textoExtraido; }
     public String getAnaliseJson() { return analiseJson; }

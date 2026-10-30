@@ -91,13 +91,8 @@ public class DocumentoService {
                 null);
     }
 
-    /** Lança {@link DocumentoNaoEncontradoException} se o documento não existe. */
-    @Transactional(readOnly = true)
-    public void verificarExiste(String id) {
-        obter(id);
-    }
-
-    private Documento obter(String id) {
+    // Visível ao pacote: o chat também precisa achar um documento pelo id da URL.
+    Documento obter(String id) {
         UUID uuid;
         try {
             uuid = UUID.fromString(id);

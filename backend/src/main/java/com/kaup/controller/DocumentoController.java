@@ -52,15 +52,4 @@ public class DocumentoController {
     public AnaliseResponse analise(@PathVariable String id) {
         return documentoService.analise(id);
     }
-
-    /**
-     * Histórico do chat. Ainda sem chat: devolve lista vazia para o frontend abrir a tela
-     * do documento (ele pede o histórico junto com a análise). Troca-se pela implementação
-     * real quando o chat existir.
-     */
-    @GetMapping("/{id}/chat/mensagens")
-    public List<Object> mensagens(@PathVariable String id) {
-        documentoService.verificarExiste(id);
-        return List.of();
-    }
 }

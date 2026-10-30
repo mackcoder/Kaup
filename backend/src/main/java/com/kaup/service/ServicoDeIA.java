@@ -1,5 +1,6 @@
 package com.kaup.service;
 
+import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -26,4 +27,12 @@ public interface ServicoDeIA {
      *         fora da lista: quem chama valida)
      */
     String classificar(String textoContrato, Map<String, String> categorias);
+
+    /**
+     * Responde uma pergunta do usuário sobre o contrato, em texto simples.
+     *
+     * @param historico mensagens anteriores da conversa, da mais antiga para a mais recente
+     * @return o texto da resposta, nunca nulo
+     */
+    String conversar(String textoContrato, List<TurnoDeConversa> historico, String pergunta);
 }
