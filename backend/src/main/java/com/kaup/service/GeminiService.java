@@ -45,7 +45,17 @@ public class GeminiService implements ServicoDeIA {
               "obrigacoes": ["..."],
               "pontosDeAtencao": ["cláusulas que merecem atenção especial do usuário"]
             }
-            Use listas vazias quando algo não constar no contrato. Não invente informações.
+            Regras:
+            - Use SOMENTE o que está escrito no texto do contrato. Não acrescente informação que
+              não conste nele.
+            - Não compare com valores de mercado, com a lei ou com outros contratos. Não diga se
+              um valor, multa ou prazo é alto, baixo, comum ou abusivo. Não dê opinião nem
+              conselho jurídico.
+            - Em "pontosDeAtencao", liste cláusulas que merecem atenção (como multas, rescisão,
+              reajuste, renovação automática, garantias), explicando apenas o que está escrito.
+            - Se um número ou nome parecer ilegível ou inconsistente por causa do OCR, copie como
+              está; não tente corrigir.
+            - Use listas vazias quando algo não constar no contrato.
             """;
 
     private final RestClient restClient;
