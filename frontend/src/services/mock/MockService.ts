@@ -276,8 +276,8 @@ export class MockService implements KaupService {
   async getProfile() {
     return structuredClone(this.profile);
   }
-  async updateProfile(profile: UserProfile) {
-    this.profile = structuredClone(profile);
+  async updateProfile(patch: Partial<UserProfile>) {
+    this.profile = { ...this.profile, ...structuredClone(patch) };
     return this.getProfile();
   }
   async health() {

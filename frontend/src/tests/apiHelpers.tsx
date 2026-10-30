@@ -45,7 +45,13 @@ export function servico(sessao: AuthUser | null, docs: KaupDocument[] = []) {
   vi.spyOn(service, "getSession").mockResolvedValue(sessao);
   vi.spyOn(service, "listDocuments").mockResolvedValue(docs);
   vi.spyOn(service, "getProfile").mockResolvedValue(perfil);
-  vi.spyOn(service, "updateProfile").mockImplementation(async (p) => p);
+  // O "servidor" simulado junta o que chega ao que já tem, como o PATCH parcial do backend.
+  let noServidor = { ...perfil };
+  vi.spyOn(service, "updateProfile").mockImplementation(async (patch) => {
+    await new Promise((r) => setTimeout(r, 40)); // latência: é ela que expõe a corrida
+    noServidor = { ...noServidor, ...patch };
+    return { ...noServidor };
+  });
   return service;
 }
 export function montar(service: ApiService, caminho = "/") {

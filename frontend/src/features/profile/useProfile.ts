@@ -28,14 +28,12 @@ export function useProfile({
   } = useApp();
   const { name, email, fontSize, explainLevel, income, shareIncomeWithAi } =
     profile;
-  const setFontSize = (fontSize: FontSize) =>
-    void saveProfile({ ...profile, fontSize });
+  const setFontSize = (fontSize: FontSize) => void saveProfile({ fontSize });
   const setExplainLevel = (explainLevel: ExplainLevel) =>
-    void saveProfile({ ...profile, explainLevel });
-  const setIncome = (income: IncomeRange) =>
-    void saveProfile({ ...profile, income });
+    void saveProfile({ explainLevel });
+  const setIncome = (income: IncomeRange) => void saveProfile({ income });
   const setShareIncome = (shareIncomeWithAi: boolean) =>
-    void saveProfile({ ...profile, shareIncomeWithAi });
+    void saveProfile({ shareIncomeWithAi });
   const [editName, setEditName] = useState(name);
   const [editEmail, setEditEmail] = useState(email);
   const [showEdit, setShowEdit] = useState(false);
@@ -84,7 +82,6 @@ export function useProfile({
     }
     if (
       !(await saveProfile({
-        ...profile,
         name: editName.trim(),
         email: editEmail.trim(),
       }))

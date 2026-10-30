@@ -82,7 +82,8 @@ describe("documentos e sessão mock", () => {
   it("atualiza preferências na sessão e exclui documentos mock", async () => {
     const s = new MockService();
     const p = await s.getProfile();
-    await s.updateProfile({ ...p, name: "Ana", income: "3to5" });
+    await s.updateProfile({ name: "Ana", income: "3to5" });
+    expect(await s.getProfile()).toEqual({ ...p, name: "Ana", income: "3to5" }); // o resto não muda
     expect((await s.getProfile()).name).toBe("Ana");
     await s.removeDocument("carros-1");
     await expect(s.getDocument("carros-1")).rejects.toThrow("não encontrado");

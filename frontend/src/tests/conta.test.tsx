@@ -28,6 +28,30 @@ describe("perfil e conta (modo API)", () => {
       ).toHaveAttribute("aria-checked", "false"),
     );
   });
+  it("duas alterações seguidas não desfazem uma à outra (cada uma envia só o que mudou)", async () => {
+    const service = servico(ana);
+    const u = userEvent.setup();
+    montar(service, "/perfil");
+    await screen.findByRole("switch", { name: /Deixar a IA usar minha renda/ });
+    // Dois cliques rápidos: o segundo parte de uma tela que ainda não viu o resultado do primeiro.
+    await u.click(screen.getByRole("button", { name: /Completa/ }));
+    await u.click(
+      screen.getByRole("button", { name: /R\$ 3\.000 a R\$ 5\.000/ }),
+    );
+    await waitFor(() => expect(service.updateProfile).toHaveBeenCalledTimes(2));
+    expect(service.updateProfile).toHaveBeenNthCalledWith(1, {
+      explainLevel: "complete",
+    });
+    expect(service.updateProfile).toHaveBeenNthCalledWith(2, {
+      income: "3to5",
+    });
+    // O que ficou no servidor tem as duas mudanças.
+    await waitFor(async () => {
+      const salvo = await vi.mocked(service.updateProfile).mock.results[1]
+        .value;
+      expect(salvo).toMatchObject({ explainLevel: "complete", income: "3to5" });
+    });
+  });
   it("só o administrador vê o aviso de que enxerga tudo", async () => {
     montar(servico(admin), "/perfil");
     expect(

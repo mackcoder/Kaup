@@ -118,12 +118,12 @@ export class ApiService implements KaupService {
   async getProfile(signal?: AbortSignal) {
     return profileFromDTO(await this.request(e.profile, { signal }));
   }
-  async updateProfile(profile: UserProfile, signal?: AbortSignal) {
+  async updateProfile(patch: Partial<UserProfile>, signal?: AbortSignal) {
     return profileFromDTO(
       await this.request(e.profile, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify(patch),
         signal,
       }),
     );

@@ -51,7 +51,8 @@ interface AppState {
   reload: () => void;
   refreshDocuments: () => Promise<void>;
   acceptDocument: (d: KaupDocument) => void;
-  saveProfile: (profile: UserProfile) => Promise<boolean>;
+  /** Salva só o que mudou; assim duas alterações seguidas não desfazem uma à outra. */
+  saveProfile: (patch: Partial<UserProfile>) => Promise<boolean>;
 }
 const Context = createContext<AppState | null>(null);
 export function AppProvider({
@@ -184,9 +185,9 @@ export function AppProvider({
     await service.removeDocument(id);
     setDocs((old) => old.filter((d) => d.id !== id));
   }
-  async function saveProfile(next: UserProfile) {
+  async function saveProfile(patch: Partial<UserProfile>) {
     try {
-      const p = await service.updateProfile(next);
+      const p = await service.updateProfile(patch);
       setProfile(p);
       setProfileError(null);
       return true;

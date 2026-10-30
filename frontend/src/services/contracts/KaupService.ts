@@ -47,8 +47,9 @@ export interface KaupService {
     signal?: AbortSignal,
   ): Promise<ContextFile>;
   getProfile(signal?: AbortSignal): Promise<UserProfile>;
+  /** Altera só os campos enviados e devolve o perfil completo, como o servidor ficou. */
   updateProfile(
-    profile: UserProfile,
+    patch: Partial<UserProfile>,
     signal?: AbortSignal,
   ): Promise<UserProfile>;
   health(signal?: AbortSignal): Promise<string>;
