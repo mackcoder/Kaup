@@ -15,9 +15,10 @@ public interface ServicoDeIA {
     /**
      * Interpreta o texto de um contrato e devolve um JSON com as chaves
      * {@code resumo}, {@code valores}, {@code prazos}, {@code multasEJuros},
-     * {@code obrigacoes} e {@code pontosDeAtencao}.
+     * {@code obrigacoes} e {@code pontosDeAtencao}. A análise usa só o nível de explicação
+     * das preferências; a renda fica restrita ao chat.
      */
-    JsonNode interpretar(String textoContrato);
+    JsonNode interpretar(String textoContrato, PreferenciasDeIA preferencias);
 
     /**
      * Escolhe a categoria do contrato entre as informadas.
@@ -34,5 +35,6 @@ public interface ServicoDeIA {
      * @param historico mensagens anteriores da conversa, da mais antiga para a mais recente
      * @return o texto da resposta, nunca nulo
      */
-    String conversar(String textoContrato, List<TurnoDeConversa> historico, String pergunta);
+    String conversar(String textoContrato, List<TurnoDeConversa> historico, String pergunta,
+                     PreferenciasDeIA preferencias);
 }

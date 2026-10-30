@@ -59,7 +59,8 @@ public class DocumentoService {
     public DocumentoResponse criar(MultipartFile arquivo, String categoryId, UsuarioLogado usuario)
             throws IOException {
         String categoria = normalizarCategoria(categoryId); // falha cedo, antes do OCR e da IA
-        AnaliseContratoResponse resultado = analiseService.analisarArquivo(arquivo);
+        PreferenciasDeIA preferencias = preferenciasDe(usuario);
+        AnaliseContratoResponse resultado = analiseService.analisarArquivo(arquivo, preferencias);
         if (categoria == null) {
             categoria = classificar(resultado.textoExtraido());
         }
@@ -146,6 +147,11 @@ public class DocumentoService {
             throw new DocumentoNaoEncontradoException();
         }
         return repository.findById(uuid).orElseThrow(DocumentoNaoEncontradoException::new);
+    }
+
+    // O perfil é lido na hora do envio: uma análise já feita não muda se o perfil mudar depois.
+    private PreferenciasDeIA preferenciasDe(UsuarioLogado usuario) {
+        return usuarios.findById(usuario.id()).map(PreferenciasDeIA::de).orElse(PreferenciasDeIA.PADRAO);
     }
 
     private DocumentoResponse paraDocumentoResponse(Documento documento) {

@@ -8,23 +8,32 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.session.FindByIndexNameSessionRepository;
+import org.springframework.session.Session;
 
 import com.kaup.dto.CadastroRequest;
 import com.kaup.entity.Papel;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
 import com.kaup.exception.EmailJaCadastradoException;
+import com.kaup.exception.OperacaoNaoPermitidaException;
 import com.kaup.repository.DocumentoRepository;
 import com.kaup.repository.UsuarioRepository;
+import com.kaup.security.UsuarioLogado;
 
 class ContaServiceTest {
 
     private UsuarioRepository repository;
     private DocumentoRepository documentos;
+    private FindByIndexNameSessionRepository<?> sessoes;
     private PasswordEncoder encoder;
     private ContaService service;
 
@@ -32,8 +41,9 @@ class ContaServiceTest {
     void preparar() {
         repository = mock(UsuarioRepository.class);
         documentos = mock(DocumentoRepository.class);
+        sessoes = mock(FindByIndexNameSessionRepository.class);
         encoder = mock(PasswordEncoder.class);
-        service = new ContaService(repository, documentos, encoder);
+        service = new ContaService(repository, documentos, encoder, sessoes);
         when(encoder.encode("senha1234")).thenReturn("hash-bcrypt");
         when(repository.save(any(Usuario.class))).thenAnswer(i -> i.getArgument(0));
     }
@@ -120,5 +130,47 @@ class ContaServiceTest {
         service.cadastrar(pedido("Bia", "bia@exemplo.com", "senha1234", "senha1234"));
 
         verify(documentos, never()).atribuirSemDono(any());
+    }
+
+    // ---- excluir a conta ----
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void comSessoesAbertas(String email, String... ids) {
+        Map sessoesAbertas = new java.util.HashMap<String, Session>();
+        for (String id : ids) {
+            sessoesAbertas.put(id, mock(Session.class));
+        }
+        when(((FindByIndexNameSessionRepository) sessoes).findByPrincipalName(email)).thenReturn(sessoesAbertas);
+    }
+
+    private Usuario conta(Papel papel) {
+        Usuario u = new Usuario();
+        org.springframework.test.util.ReflectionTestUtils.setField(u, "id", UUID.randomUUID());
+        u.setEmail("ana@exemplo.com");
+        u.setPapel(papel);
+        when(repository.findById(u.getId())).thenReturn(Optional.of(u));
+        return u;
+    }
+
+    @Test
+    void excluirApagaAContaEEncerraTodasAsSessoesDela() {
+        Usuario ana = conta(Papel.USER);
+        comSessoesAbertas("ana@exemplo.com", "sessao-notebook", "sessao-celular");
+
+        service.excluir(new UsuarioLogado(ana.getId(), "ana@exemplo.com", Papel.USER, null));
+
+        verify(repository).delete(ana);
+        verify(sessoes).deleteById("sessao-notebook");
+        verify(sessoes).deleteById("sessao-celular");
+    }
+
+    @Test
+    void contaDeAdministradorNaoPodeSerExcluida() {
+        Usuario admin = conta(Papel.ADMIN);
+
+        assertThrows(OperacaoNaoPermitidaException.class,
+                () -> service.excluir(new UsuarioLogado(admin.getId(), "admin@admin", Papel.ADMIN, null)));
+
+        verify(repository, never()).delete(any(Usuario.class));
     }
 }

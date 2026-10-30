@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -25,11 +26,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.kaup.dto.MensagemChatResponse;
 import com.kaup.entity.Documento;
 import com.kaup.entity.Papel;
+import com.kaup.entity.Usuario;
 import com.kaup.entity.MensagemChat;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.MensagemChatRepository;
+import com.kaup.repository.UsuarioRepository;
 import com.kaup.security.UsuarioLogado;
 
 class ChatServiceTest {
@@ -37,6 +40,7 @@ class ChatServiceTest {
     private final UUID documentoId = UUID.randomUUID();
     private DocumentoService documentoService;
     private MensagemChatRepository repository;
+    private UsuarioRepository usuarios;
     private ServicoDeIA servicoDeIA;
     private ChatService service;
     private Documento documento;
@@ -46,8 +50,9 @@ class ChatServiceTest {
     void preparar() {
         documentoService = mock(DocumentoService.class);
         repository = mock(MensagemChatRepository.class);
+        usuarios = mock(UsuarioRepository.class);
         servicoDeIA = mock(ServicoDeIA.class);
-        service = new ChatService(documentoService, repository, servicoDeIA);
+        service = new ChatService(documentoService, repository, usuarios, servicoDeIA);
 
         documento = new Documento();
         ReflectionTestUtils.setField(documento, "id", documentoId);
@@ -56,7 +61,7 @@ class ChatServiceTest {
         when(documentoService.obterParaLeitura(eq(documentoId.toString()), any())).thenReturn(documento);
 
         when(repository.findByDocumentoIdOrderByIdDesc(eq(documentoId), any(Pageable.class))).thenReturn(List.of());
-        when(servicoDeIA.conversar(anyString(), anyList(), anyString())).thenReturn("  A multa é de 10%.  ");
+        when(servicoDeIA.conversar(anyString(), anyList(), anyString(), any())).thenReturn("  A multa é de 10%.  ");
         // Simula o banco: saveAll atribui ids crescentes, na ordem da lista.
         when(repository.saveAll(anyList())).thenAnswer(invocacao -> {
             List<MensagemChat> mensagens = new ArrayList<>(invocacao.getArgument(0));
@@ -82,7 +87,7 @@ class ChatServiceTest {
     void respondeComOContratoEGravaPerguntaERespostaJuntas() {
         MensagemChatResponse resposta = service.perguntar(documentoId.toString(), "  Qual é a multa?  ", usuario);
 
-        verify(servicoDeIA).conversar("texto do contrato", List.of(), "Qual é a multa?");
+        verify(servicoDeIA).conversar("texto do contrato", List.of(), "Qual é a multa?", PreferenciasDeIA.PADRAO);
 
         ArgumentCaptor<List<MensagemChat>> gravadas = ArgumentCaptor.forClass(List.class);
         verify(repository).saveAll(gravadas.capture());
@@ -113,7 +118,7 @@ class ChatServiceTest {
                 new TurnoDeConversa("user", "pergunta 1"),
                 new TurnoDeConversa("assistant", "resposta 1"),
                 new TurnoDeConversa("user", "pergunta 2"),
-                new TurnoDeConversa("assistant", "resposta 2")), "pergunta 3");
+                new TurnoDeConversa("assistant", "resposta 2")), "pergunta 3", PreferenciasDeIA.PADRAO);
     }
 
     @Test
@@ -145,7 +150,7 @@ class ChatServiceTest {
 
     @Test
     void falhaDaIaNaoGravaNada() {
-        when(servicoDeIA.conversar(anyString(), anyList(), anyString()))
+        when(servicoDeIA.conversar(anyString(), anyList(), anyString(), any()))
                 .thenThrow(new ServicoExternoException("IA (Gemini)", null));
 
         assertThrows(ServicoExternoException.class, () -> service.perguntar(documentoId.toString(), "oi", usuario));
@@ -155,7 +160,7 @@ class ChatServiceTest {
 
     @Test
     void respostaVaziaDaIaContaComoFalhaENaoGravaNada() {
-        when(servicoDeIA.conversar(anyString(), anyList(), anyString())).thenReturn("   ");
+        when(servicoDeIA.conversar(anyString(), anyList(), anyString(), any())).thenReturn("   ");
 
         assertThrows(ServicoExternoException.class, () -> service.perguntar(documentoId.toString(), "oi", usuario));
 
@@ -186,5 +191,31 @@ class ChatServiceTest {
         assertEquals("assistant", historico.get(1).role());
         assertEquals(documentoId.toString(), historico.get(0).documentId());
         assertEquals("1", historico.get(0).id());
+    }
+
+    @Test
+    void aIaRecebeOPerfilAtualDeQuemPergunta() {
+        Usuario perfil = new Usuario();
+        perfil.setExplainLevel("complete");
+        perfil.setIncome("3to5");
+        perfil.setCompartilharRenda(true);
+        when(usuarios.findById(usuario.id())).thenReturn(Optional.of(perfil));
+
+        service.perguntar(documentoId.toString(), "Posso pagar essa parcela?", usuario);
+
+        verify(servicoDeIA).conversar("texto do contrato", List.of(), "Posso pagar essa parcela?",
+                new PreferenciasDeIA("complete", "entre R$ 3.000 e R$ 5.000"));
+    }
+
+    @Test
+    void rendaBloqueadaNaoVaiParaAIa() {
+        Usuario perfil = new Usuario();
+        perfil.setIncome("more15");
+        perfil.setCompartilharRenda(false);
+        when(usuarios.findById(usuario.id())).thenReturn(Optional.of(perfil));
+
+        service.perguntar(documentoId.toString(), "oi", usuario);
+
+        verify(servicoDeIA).conversar("texto do contrato", List.of(), "oi", new PreferenciasDeIA("simple", null));
     }
 }

@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -75,7 +76,7 @@ class DocumentoServiceTest {
     @Test
     void criaDocumentoComDadosDaAnalise() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
 
         DocumentoResponse resposta = service.criar(contrato, "Casa", usuario);
 
@@ -102,7 +103,7 @@ class DocumentoServiceTest {
     @Test
     void categoriaEscolhidaPeloUsuarioNaoChamaAClassificacao() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
 
         assertEquals("Carros", service.criar(contrato, "Carros", usuario).categoryId());
 
@@ -112,7 +113,7 @@ class DocumentoServiceTest {
     @Test
     void semCategoriaAIaClassifica() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenReturn("Casa");
 
         assertEquals("Casa", service.criar(contrato, null, usuario).categoryId());
@@ -122,7 +123,7 @@ class DocumentoServiceTest {
     @Test
     void respostaDaIaEmMinusculaEhNormalizada() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenReturn(" banco ");
 
         assertEquals("Banco", service.criar(contrato, null, usuario).categoryId());
@@ -131,7 +132,7 @@ class DocumentoServiceTest {
     @Test
     void respostaDaIaForaDaListaOuVaziaViraOutros() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
 
         when(servicoDeIA.classificar(any(), any())).thenReturn("Viagens");
         assertEquals("Outros", service.criar(contrato, null, usuario).categoryId());
@@ -143,7 +144,7 @@ class DocumentoServiceTest {
     @Test
     void falhaNaClassificacaoNaoDerrubaOUploadEVaiParaOutros() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenThrow(new ServicoExternoException("IA (Gemini)", null));
 
         DocumentoResponse resposta = service.criar(contrato, null, usuario);
@@ -155,7 +156,7 @@ class DocumentoServiceTest {
     @Test
     void aClassificacaoRecebeOTextoLidoEAsCategoriasConhecidas() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
         when(servicoDeIA.classificar(any(), any())).thenReturn("Casa");
 
         service.criar(contrato, null, usuario);
@@ -166,7 +167,7 @@ class DocumentoServiceTest {
     @Test
     void falhaNaAnaliseNaoSalvaNada() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenThrow(new ContratoInvalidoException("ilegível"));
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenThrow(new ContratoInvalidoException("ilegível"));
 
         assertThrows(ContratoInvalidoException.class, () -> service.criar(contrato, null, usuario));
 
@@ -176,7 +177,7 @@ class DocumentoServiceTest {
     @Test
     void nomeDoArquivoPerdeOCaminhoDoCliente() throws Exception {
         MockMultipartFile contrato = arquivo("C:\\Users\\fulano\\contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
 
         assertEquals("contrato.pdf", service.criar(contrato, null, usuario).name());
     }
@@ -245,7 +246,7 @@ class DocumentoServiceTest {
     @Test
     void documentoCriadoPertenceAQuemEnviou() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
-        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
         Usuario referencia = new Usuario();
         when(usuarios.getReferenceById(usuario.id())).thenReturn(referencia);
 
@@ -317,5 +318,20 @@ class DocumentoServiceTest {
         assertThrows(OperacaoNaoPermitidaException.class, () -> service.excluir(alheio.getId().toString(), admin));
 
         verify(repository, never()).delete(any(Documento.class));
+    }
+
+    @Test
+    void aAnaliseUsaOPerfilDeQuemEnvia() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        Usuario perfil = new Usuario();
+        perfil.setExplainLevel("complete");
+        perfil.setIncome("3to5");
+        when(usuarios.findById(usuario.id())).thenReturn(Optional.of(perfil));
+        when(analiseService.analisarArquivo(eq(contrato), any())).thenReturn(resultado());
+
+        service.criar(contrato, "Casa", usuario);
+
+        // A renda existe no perfil, mas o serviço a repassa à camada de IA, que decide não usá-la na análise.
+        verify(analiseService).analisarArquivo(contrato, new PreferenciasDeIA("complete", "entre R$ 3.000 e R$ 5.000"));
     }
 }

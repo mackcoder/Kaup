@@ -25,22 +25,23 @@ public class AnaliseService {
     }
 
     /** Arquivo do contrato -> OCR -> IA -> análise estruturada. */
-    public AnaliseContratoResponse analisarArquivo(MultipartFile arquivo) throws IOException {
+    public AnaliseContratoResponse analisarArquivo(MultipartFile arquivo, PreferenciasDeIA preferencias)
+            throws IOException {
         validar(arquivo);
         String texto = ocrService.extrairTexto(arquivo);
         if (texto == null || texto.isBlank()) {
             throw new ContratoInvalidoException(
                     "Não foi possível ler texto no arquivo enviado. Tente uma foto mais nítida.");
         }
-        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto));
+        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto, preferencias));
     }
 
     /** Mesmo fluxo a partir de texto já extraído (pula o OCR). */
-    public AnaliseContratoResponse analisarTexto(String texto) {
+    public AnaliseContratoResponse analisarTexto(String texto, PreferenciasDeIA preferencias) {
         if (texto == null || texto.isBlank()) {
             throw new ContratoInvalidoException("O campo 'texto' é obrigatório.");
         }
-        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto));
+        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto, preferencias));
     }
 
     private void validar(MultipartFile arquivo) {

@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.kaup.dto.AnaliseContratoResponse;
 import com.kaup.dto.TextoContratoRequest;
 import com.kaup.service.AnaliseService;
+import com.kaup.service.PreferenciasDeIA;
 
 @RestController
 @RequestMapping("/api/analise")
@@ -34,12 +35,12 @@ public class AnaliseController {
     @PostMapping(value = "/contrato", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AnaliseContratoResponse analisarContrato(@RequestParam("arquivo") MultipartFile arquivo)
             throws IOException {
-        return analiseService.analisarArquivo(arquivo);
+        return analiseService.analisarArquivo(arquivo, PreferenciasDeIA.PADRAO);
     }
 
     /** Mesmo fluxo a partir de texto já extraído (pula o OCR). Útil para testar a IA. */
     @PostMapping(value = "/texto", consumes = MediaType.APPLICATION_JSON_VALUE)
     public AnaliseContratoResponse analisarTexto(@RequestBody TextoContratoRequest request) {
-        return analiseService.analisarTexto(request.texto());
+        return analiseService.analisarTexto(request.texto(), PreferenciasDeIA.PADRAO);
     }
 }

@@ -122,8 +122,9 @@ public class GeminiService implements ServicoDeIA {
     }
 
     @Override
-    public JsonNode interpretar(String textoContrato) {
-        return gerarJson(INSTRUCAO, textoContrato);
+    public JsonNode interpretar(String textoContrato, PreferenciasDeIA preferencias) {
+        // A renda não entra na análise (que descreve sem julgar): só o estilo da explicação.
+        return gerarJson(INSTRUCAO + "\n" + preferencias.instrucaoDeExplicacao() + "\n", textoContrato);
     }
 
     @Override
@@ -136,7 +137,8 @@ public class GeminiService implements ServicoDeIA {
     }
 
     @Override
-    public String conversar(String textoContrato, List<TurnoDeConversa> historico, String pergunta) {
+    public String conversar(String textoContrato, List<TurnoDeConversa> historico, String pergunta,
+                            PreferenciasDeIA preferencias) {
         List<Map<String, Object>> conteudos = new ArrayList<>();
         // O contrato vai como dado numa mensagem do usuário, nunca dentro da instrução de sistema.
         conteudos.add(turno("user", "<contrato>\n" + textoContrato + "\n</contrato>"));
@@ -147,8 +149,13 @@ public class GeminiService implements ServicoDeIA {
         }
         conteudos.add(turno("user", pergunta));
 
+        StringBuilder instrucao = new StringBuilder(INSTRUCAO_CONVERSA)
+                .append('\n').append(preferencias.instrucaoDeExplicacao()).append('\n');
+        if (preferencias.instrucaoDeRenda() != null) {
+            instrucao.append(preferencias.instrucaoDeRenda()).append('\n');
+        }
         Map<String, Object> body = Map.of(
-                "systemInstruction", Map.of("parts", List.of(Map.of("text", INSTRUCAO_CONVERSA))),
+                "systemInstruction", Map.of("parts", List.of(Map.of("text", instrucao.toString()))),
                 "contents", conteudos);
         return chamar(body).trim();
     }

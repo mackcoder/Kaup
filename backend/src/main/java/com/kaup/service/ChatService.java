@@ -14,6 +14,7 @@ import com.kaup.entity.MensagemChat;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.MensagemChatRepository;
+import com.kaup.repository.UsuarioRepository;
 import com.kaup.security.UsuarioLogado;
 
 /** Chat sobre um documento: pergunta do usuário, resposta da IA e histórico. */
@@ -27,12 +28,14 @@ public class ChatService {
 
     private final DocumentoService documentoService;
     private final MensagemChatRepository repository;
+    private final UsuarioRepository usuarios;
     private final ServicoDeIA servicoDeIA;
 
     public ChatService(DocumentoService documentoService, MensagemChatRepository repository,
-                       ServicoDeIA servicoDeIA) {
+                       UsuarioRepository usuarios, ServicoDeIA servicoDeIA) {
         this.documentoService = documentoService;
         this.repository = repository;
+        this.usuarios = usuarios;
         this.servicoDeIA = servicoDeIA;
     }
 
@@ -54,7 +57,10 @@ public class ChatService {
                 .map(m -> new TurnoDeConversa(m.getPapel(), m.getConteudo()))
                 .toList();
 
-        String resposta = servicoDeIA.conversar(documento.getTextoExtraido(), historico, texto);
+        // Perfil lido a cada pergunta: mudar o nível de explicação ou bloquear a renda vale já na próxima.
+        PreferenciasDeIA preferencias = usuarios.findById(usuario.id())
+                .map(PreferenciasDeIA::de).orElse(PreferenciasDeIA.PADRAO);
+        String resposta = servicoDeIA.conversar(documento.getTextoExtraido(), historico, texto, preferencias);
         if (resposta == null || resposta.isBlank()) {
             throw new ServicoExternoException("IA", null);
         }

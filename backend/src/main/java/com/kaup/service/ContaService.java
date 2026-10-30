@@ -3,8 +3,10 @@ package com.kaup.service;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.session.FindByIndexNameSessionRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,8 +15,10 @@ import com.kaup.entity.Papel;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
 import com.kaup.exception.EmailJaCadastradoException;
+import com.kaup.exception.OperacaoNaoPermitidaException;
 import com.kaup.repository.DocumentoRepository;
 import com.kaup.repository.UsuarioRepository;
+import com.kaup.security.UsuarioLogado;
 
 /** Cadastro e consulta de contas. */
 @Service
@@ -32,11 +36,14 @@ public class ContaService {
     private final UsuarioRepository repository;
     private final DocumentoRepository documentos;
     private final PasswordEncoder encoder;
+    private final FindByIndexNameSessionRepository<?> sessoes;
 
-    public ContaService(UsuarioRepository repository, DocumentoRepository documentos, PasswordEncoder encoder) {
+    public ContaService(UsuarioRepository repository, DocumentoRepository documentos, PasswordEncoder encoder,
+                        FindByIndexNameSessionRepository<?> sessoes) {
         this.repository = repository;
         this.documentos = documentos;
         this.encoder = encoder;
+        this.sessoes = sessoes;
     }
 
     @Transactional
@@ -61,6 +68,25 @@ public class ContaService {
             documentos.atribuirSemDono(criado);
         }
         return criado;
+    }
+
+    /**
+     * Apaga a conta; documentos e conversas somem junto, pela cascata do banco. As sessões abertas
+     * da conta (em outros navegadores, por exemplo) também são encerradas. O administrador não
+     * pode ser excluído por aqui.
+     */
+    @Transactional
+    public void excluir(UsuarioLogado logado) {
+        Usuario usuario = repository.findById(logado.id())
+                .orElseThrow(() -> new DadosInvalidosException("A conta não existe mais."));
+        if (usuario.getPapel() == Papel.ADMIN) {
+            throw new OperacaoNaoPermitidaException("A conta de administrador não pode ser excluída.");
+        }
+        repository.delete(usuario);
+        // A sessão é indexada pelo e-mail com que a pessoa entrou, que pode ter mudado depois.
+        // distinct(): na maioria dos casos os dois são o mesmo e-mail (Set.of recusaria o duplicado).
+        Stream.of(usuario.getEmail(), logado.getUsername()).distinct()
+                .forEach(email -> sessoes.findByPrincipalName(email).keySet().forEach(sessoes::deleteById));
     }
 
     @Transactional(readOnly = true)
