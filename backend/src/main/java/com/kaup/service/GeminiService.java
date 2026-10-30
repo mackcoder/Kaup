@@ -6,7 +6,9 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -21,7 +23,8 @@ import com.kaup.exception.ServicoExternoException;
  * estruturado (valores, prazos, multas, obrigações e pontos de atenção).
  */
 @Service
-public class GeminiService {
+@ConditionalOnProperty(name = "ia.provedor", havingValue = "gemini", matchIfMissing = true)
+public class GeminiService implements ServicoDeIA {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
@@ -52,15 +55,22 @@ public class GeminiService {
     public GeminiService(@Value("${gemini.api.key}") String apiKey,
                          @Value("${gemini.api.url}") String apiUrl,
                          @Value("${gemini.api.model}") String model,
+                         @Value("${gemini.api.read-timeout-ms}") int readTimeoutMs,
                          ObjectMapper objectMapper) {
         this.model = model;
         this.objectMapper = objectMapper;
+        // Sem timeout, um Gemini travado prenderia a requisição indefinidamente.
+        SimpleClientHttpRequestFactory fabrica = new SimpleClientHttpRequestFactory();
+        fabrica.setConnectTimeout(10_000);
+        fabrica.setReadTimeout(readTimeoutMs);
         this.restClient = RestClient.builder()
+                .requestFactory(fabrica)
                 .baseUrl(apiUrl)
                 .defaultHeader("x-goog-api-key", apiKey.trim())
                 .build();
     }
 
+    @Override
     public JsonNode interpretar(String textoContrato) {
         Map<String, Object> body = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", INSTRUCAO))),

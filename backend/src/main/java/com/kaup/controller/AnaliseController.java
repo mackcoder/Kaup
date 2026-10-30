@@ -1,7 +1,6 @@
 package com.kaup.controller;
 
 import java.io.IOException;
-import java.util.Set;
 
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,23 +13,16 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.kaup.dto.AnaliseContratoResponse;
 import com.kaup.dto.TextoContratoRequest;
-import com.kaup.exception.ContratoInvalidoException;
-import com.kaup.service.GeminiService;
-import com.kaup.service.OcrService;
+import com.kaup.service.AnaliseService;
 
 @RestController
 @RequestMapping("/api/analise")
 public class AnaliseController {
 
-    private static final Set<String> TIPOS_ACEITOS = Set.of(
-            "application/pdf", "image/png", "image/jpeg");
+    private final AnaliseService analiseService;
 
-    private final OcrService ocrService;
-    private final GeminiService geminiService;
-
-    public AnaliseController(OcrService ocrService, GeminiService geminiService) {
-        this.ocrService = ocrService;
-        this.geminiService = geminiService;
+    public AnaliseController(AnaliseService analiseService) {
+        this.analiseService = analiseService;
     }
 
     @GetMapping("/health")
@@ -42,33 +34,12 @@ public class AnaliseController {
     @PostMapping(value = "/contrato", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public AnaliseContratoResponse analisarContrato(@RequestParam("arquivo") MultipartFile arquivo)
             throws IOException {
-        validar(arquivo);
-        String texto = ocrService.extrairTexto(arquivo);
-        if (texto == null || texto.isBlank()) {
-            throw new ContratoInvalidoException(
-                    "Não foi possível ler texto no arquivo enviado. Tente uma foto mais nítida.");
-        }
-        return new AnaliseContratoResponse(texto, geminiService.interpretar(texto));
+        return analiseService.analisarArquivo(arquivo);
     }
 
     /** Mesmo fluxo a partir de texto já extraído (pula o OCR). Útil para testar a IA. */
     @PostMapping(value = "/texto", consumes = MediaType.APPLICATION_JSON_VALUE)
     public AnaliseContratoResponse analisarTexto(@RequestBody TextoContratoRequest request) {
-        if (request.texto() == null || request.texto().isBlank()) {
-            throw new ContratoInvalidoException("O campo 'texto' é obrigatório.");
-        }
-        return new AnaliseContratoResponse(request.texto(), geminiService.interpretar(request.texto()));
-    }
-
-    private void validar(MultipartFile arquivo) {
-        if (arquivo.isEmpty()) {
-            throw new ContratoInvalidoException("Nenhum arquivo foi enviado.");
-        }
-        String tipo = arquivo.getContentType();
-        // Set.of(...).contains(null) lança NullPointerException, por isso a checagem de null
-        if (tipo == null || !TIPOS_ACEITOS.contains(tipo)) {
-            throw new ContratoInvalidoException(
-                    "Formato não suportado. Envie PDF, PNG ou JPEG.");
-        }
+        return analiseService.analisarTexto(request.texto());
     }
 }

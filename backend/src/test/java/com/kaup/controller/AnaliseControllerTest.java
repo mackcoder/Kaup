@@ -9,14 +9,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.kaup.service.GeminiService;
+import com.kaup.service.AnaliseService;
 import com.kaup.service.OcrService;
+import com.kaup.service.ServicoDeIA;
 
 @WebMvcTest(AnaliseController.class)
+@Import(AnaliseService.class)
 class AnaliseControllerTest {
 
     @Autowired
@@ -26,7 +29,7 @@ class AnaliseControllerTest {
     private OcrService ocrService;
 
     @MockBean
-    private GeminiService geminiService;
+    private ServicoDeIA servicoDeIA;
 
     @Test
     void healthRetornaOk() throws Exception {
