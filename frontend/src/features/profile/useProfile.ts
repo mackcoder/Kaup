@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useApp } from "../../app/AppProvider";
+import { errorMessage } from "../../services";
 import { countDocuments } from "../documents/selectors";
 import { profileStyles, FONT_SCALE } from "../../components/profile/styles";
 import type {
@@ -15,14 +16,26 @@ export function useProfile({
   onBack: () => void;
   onOpenAllDocs: (filter?: FilterKey) => void;
 }) {
-  const { profile, saveProfile, documents, service, profileError } = useApp();
-  const { name, email, fontSize, explainLevel, income } = profile;
+  const {
+    profile,
+    saveProfile,
+    documents,
+    service,
+    profileError,
+    user,
+    logout,
+    deleteAccount,
+  } = useApp();
+  const { name, email, fontSize, explainLevel, income, shareIncomeWithAi } =
+    profile;
   const setFontSize = (fontSize: FontSize) =>
     void saveProfile({ ...profile, fontSize });
   const setExplainLevel = (explainLevel: ExplainLevel) =>
     void saveProfile({ ...profile, explainLevel });
   const setIncome = (income: IncomeRange) =>
     void saveProfile({ ...profile, income });
+  const setShareIncome = (shareIncomeWithAi: boolean) =>
+    void saveProfile({ ...profile, shareIncomeWithAi });
   const [editName, setEditName] = useState(name);
   const [editEmail, setEditEmail] = useState(email);
   const [showEdit, setShowEdit] = useState(false);
@@ -38,6 +51,8 @@ export function useProfile({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggedOut, setLoggedOut] = useState(false);
   const [helpMsg, setHelpMsg] = useState<string | null>(null);
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [accountBusy, setAccountBusy] = useState(false);
 
   // Tap feedback
   const [tapped, setTapped] = useState<string | null>(null);
@@ -78,6 +93,38 @@ export function useProfile({
     setShowEdit(false);
     setSavedMsg(true);
     setTimeout(() => setSavedMsg(false), 2500);
+  }
+
+  // Na demonstração sair e apagar são só simulação na tela; na API acontecem de verdade e, ao
+  // terminar, o app volta sozinho para a tela de entrar (não há mais ninguém logado).
+  async function confirmLogout() {
+    if (service.mode === "mock") {
+      setShowLogoutConfirm(false);
+      setLoggedOut(true);
+      return;
+    }
+    setAccountBusy(true);
+    setAccountError(null);
+    try {
+      await logout();
+    } catch (e) {
+      setAccountError(errorMessage(e));
+      setAccountBusy(false);
+    }
+  }
+  async function confirmDeleteAccount() {
+    if (service.mode === "mock") {
+      setDeleteSimulated(true);
+      return;
+    }
+    setAccountBusy(true);
+    setAccountError(null);
+    try {
+      await deleteAccount();
+    } catch (e) {
+      setAccountError(errorMessage(e));
+      setAccountBusy(false);
+    }
   }
 
   const docStats = [
@@ -207,9 +254,16 @@ export function useProfile({
     fontSize,
     explainLevel,
     income,
+    shareIncomeWithAi,
+    user,
     setFontSize,
     setExplainLevel,
     setIncome,
+    setShareIncome,
+    accountError,
+    accountBusy,
+    confirmLogout,
+    confirmDeleteAccount,
     editName,
     setEditName,
     editEmail,

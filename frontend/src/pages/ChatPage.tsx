@@ -12,6 +12,7 @@ import ContextPopup from "../components/chat/ContextPopup";
 import TypingBubble from "../components/chat/TypingBubble";
 import MessageList from "../components/chat/MessageList";
 import ChatComposer from "../components/chat/ChatComposer";
+import DocumentActions from "../components/chat/DocumentActions";
 export default function ChatPage() {
   const { documentId } = useParams();
   const { service } = useApp();
@@ -171,6 +172,7 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
             </div>
           </div>
         </div>
+        <DocumentActions doc={doc} />
       </div>
 
       {/* ── CONTEXT POPUP ── */}

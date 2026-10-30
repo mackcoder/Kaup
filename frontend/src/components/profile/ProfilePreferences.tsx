@@ -5,9 +5,12 @@ export default function ProfilePreferences({ model }: { model: ProfileModel }) {
     fontSize,
     explainLevel,
     income,
+    shareIncomeWithAi,
+    service,
     setFontSize,
     setExplainLevel,
     setIncome,
+    setShareIncome,
     audioKey,
     tapped,
     fs,
@@ -170,9 +173,31 @@ export default function ProfilePreferences({ model }: { model: ProfileModel }) {
         <div className="kaup-254">
           <span className="kaup-255">🔒</span>
           <span className="kaup-256" style={{ fontSize: fs(13) }}>
-            Renda apenas na memória desta sessão.
+            {service.mode === "mock"
+              ? "Demonstração: a renda fica só na memória desta sessão."
+              : "A renda fica guardada só na sua conta."}
           </span>
         </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={shareIncomeWithAi}
+          className={`share-toggle${shareIncomeWithAi ? " on" : ""}`}
+          style={{ fontSize: fs(15) }}
+          onClick={() => tap("share", () => setShareIncome(!shareIncomeWithAi))}
+        >
+          <span className="share-toggle-text">
+            <strong>Deixar a IA usar minha renda</strong>
+            <small style={{ fontSize: fs(13) }}>
+              {shareIncomeWithAi
+                ? "Ligado: a faixa de renda é enviada à IA só para dizer se as parcelas cabem no seu orçamento. Seu nome e e-mail nunca são enviados."
+                : "Desligado: a IA não recebe a sua renda, mesmo que você tenha escolhido uma faixa acima."}
+            </small>
+          </span>
+          <span className="share-toggle-track" aria-hidden="true">
+            <span className="share-toggle-knob" />
+          </span>
+        </button>
       </div>
     </>
   );
