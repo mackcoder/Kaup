@@ -26,20 +26,23 @@ import com.kaup.dto.DocumentoResponse;
 import com.kaup.entity.Documento;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
+import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.DocumentoRepository;
 
 class DocumentoServiceTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private AnaliseService analiseService;
+    private ServicoDeIA servicoDeIA;
     private DocumentoRepository repository;
     private DocumentoService service;
 
     @BeforeEach
     void preparar() {
         analiseService = mock(AnaliseService.class);
+        servicoDeIA = mock(ServicoDeIA.class);
         repository = mock(DocumentoRepository.class);
-        service = new DocumentoService(analiseService, repository, mapper);
+        service = new DocumentoService(analiseService, servicoDeIA, repository, mapper);
         // Simula o banco: save devolve a mesma entidade, já com id.
         when(repository.save(any(Documento.class))).thenAnswer(invocacao -> {
             Documento documento = invocacao.getArgument(0);
@@ -87,12 +90,67 @@ class DocumentoServiceTest {
     }
 
     @Test
-    void categoriaEmBrancoViraNula() throws Exception {
+    void categoriaEscolhidaPeloUsuarioNaoChamaAClassificacao() throws Exception {
         MockMultipartFile contrato = arquivo("contrato.pdf");
         when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
 
-        assertNull(service.criar(contrato, "  ").categoryId());
-        assertNull(service.criar(contrato, null).categoryId());
+        assertEquals("Carros", service.criar(contrato, "Carros").categoryId());
+
+        verifyNoInteractions(servicoDeIA);
+    }
+
+    @Test
+    void semCategoriaAIaClassifica() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(servicoDeIA.classificar(any(), any())).thenReturn("Casa");
+
+        assertEquals("Casa", service.criar(contrato, null).categoryId());
+        assertEquals("Casa", service.criar(contrato, "  ").categoryId()); // em branco = sem categoria
+    }
+
+    @Test
+    void respostaDaIaEmMinusculaEhNormalizada() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(servicoDeIA.classificar(any(), any())).thenReturn(" banco ");
+
+        assertEquals("Banco", service.criar(contrato, null).categoryId());
+    }
+
+    @Test
+    void respostaDaIaForaDaListaOuVaziaViraOutros() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+
+        when(servicoDeIA.classificar(any(), any())).thenReturn("Viagens");
+        assertEquals("Outros", service.criar(contrato, null).categoryId());
+
+        when(servicoDeIA.classificar(any(), any())).thenReturn("");
+        assertEquals("Outros", service.criar(contrato, null).categoryId());
+    }
+
+    @Test
+    void falhaNaClassificacaoNaoDerrubaOUploadEVaiParaOutros() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(servicoDeIA.classificar(any(), any())).thenThrow(new ServicoExternoException("IA (Gemini)", null));
+
+        DocumentoResponse resposta = service.criar(contrato, null);
+
+        assertEquals("Outros", resposta.categoryId());
+        verify(repository).save(any(Documento.class)); // o documento analisado não se perde
+    }
+
+    @Test
+    void aClassificacaoRecebeOTextoLidoEAsCategoriasConhecidas() throws Exception {
+        MockMultipartFile contrato = arquivo("contrato.pdf");
+        when(analiseService.analisarArquivo(contrato)).thenReturn(resultado());
+        when(servicoDeIA.classificar(any(), any())).thenReturn("Casa");
+
+        service.criar(contrato, null);
+
+        verify(servicoDeIA).classificar("texto lido do contrato", Categorias.DESCRICOES);
     }
 
     @Test

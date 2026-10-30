@@ -2,7 +2,6 @@ package com.kaup.service;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -20,6 +19,7 @@ import com.kaup.dto.DocumentoResponse;
 import com.kaup.entity.Documento;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
+import com.kaup.exception.ServicoExternoException;
 import com.kaup.repository.DocumentoRepository;
 
 /** Cria e consulta documentos. Traduz entidade e JSON da IA para o formato do frontend. */
@@ -28,32 +28,34 @@ public class DocumentoService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentoService.class);
 
-    /** Chaves de categoria que o frontend conhece (frontend/src/styles/categories.ts). */
-    static final Set<String> CATEGORIAS = Set.of("Carros", "Casa", "Trabalho", "Banco", "Outros");
-
     static final String STATUS_CONCLUIDO = "completed";
 
     private static final int TAMANHO_MAX_NOME = 255;
 
     private final AnaliseService analiseService;
+    private final ServicoDeIA servicoDeIA;
     private final DocumentoRepository repository;
     private final ObjectMapper objectMapper;
 
-    public DocumentoService(AnaliseService analiseService, DocumentoRepository repository,
-                            ObjectMapper objectMapper) {
+    public DocumentoService(AnaliseService analiseService, ServicoDeIA servicoDeIA,
+                            DocumentoRepository repository, ObjectMapper objectMapper) {
         this.analiseService = analiseService;
+        this.servicoDeIA = servicoDeIA;
         this.repository = repository;
         this.objectMapper = objectMapper;
     }
 
     /**
-     * Analisa o arquivo (OCR + IA) e só então grava. Se o OCR ou a IA falharem, a exceção
-     * sobe e nada é salvo. Não é transacional de propósito: a análise leva segundos e não
-     * deve segurar uma conexão do banco.
+     * Analisa o arquivo (OCR + IA) e só então grava. Se o OCR ou a análise falharem, a exceção
+     * sobe e nada é salvo. Se o usuário não escolheu categoria, a IA classifica. Não é
+     * transacional de propósito: a análise leva segundos e não deve segurar uma conexão do banco.
      */
     public DocumentoResponse criar(MultipartFile arquivo, String categoryId) throws IOException {
         String categoria = normalizarCategoria(categoryId); // falha cedo, antes do OCR e da IA
         AnaliseContratoResponse resultado = analiseService.analisarArquivo(arquivo);
+        if (categoria == null) {
+            categoria = classificar(resultado.textoExtraido());
+        }
 
         Documento documento = new Documento();
         documento.setNome(nomeSeguro(arquivo.getOriginalFilename()));
@@ -131,10 +133,23 @@ public class DocumentoService {
         if (categoryId == null || categoryId.isBlank()) {
             return null;
         }
-        if (!CATEGORIAS.contains(categoryId)) {
+        // Aqui a chave tem que ser exata: um valor errado vindo do frontend é erro de quem chamou.
+        if (!Categorias.DESCRICOES.containsKey(categoryId)) {
             throw new ContratoInvalidoException("Categoria inválida: " + categoryId + ".");
         }
         return categoryId;
+    }
+
+    // A classificação é um extra: se a IA falhar ou responder algo fora da lista, o documento
+    // continua válido e vai para "Outros", em vez de perder um upload que já foi analisado.
+    private String classificar(String texto) {
+        try {
+            String categoria = Categorias.normalizar(servicoDeIA.classificar(texto, Categorias.DESCRICOES));
+            return categoria != null ? categoria : Categorias.OUTROS;
+        } catch (ServicoExternoException e) {
+            log.warn("Não foi possível classificar o documento; usando '{}'", Categorias.OUTROS, e);
+            return Categorias.OUTROS;
+        }
     }
 
     // O nome vem do cliente: descarta caminhos (C:\pasta\arquivo.pdf, ../arquivo.pdf) e limita o tamanho.

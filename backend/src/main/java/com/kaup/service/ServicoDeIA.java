@@ -1,5 +1,7 @@
 package com.kaup.service;
 
+import java.util.Map;
+
 import com.fasterxml.jackson.databind.JsonNode;
 
 /**
@@ -15,4 +17,13 @@ public interface ServicoDeIA {
      * {@code obrigacoes} e {@code pontosDeAtencao}.
      */
     JsonNode interpretar(String textoContrato);
+
+    /**
+     * Escolhe a categoria do contrato entre as informadas.
+     *
+     * @param categorias chave -> descrição curta de cada categoria possível
+     * @return a chave que a IA escolheu, exatamente como ela respondeu (pode vir vazia ou
+     *         fora da lista: quem chama valida)
+     */
+    String classificar(String textoContrato, Map<String, String> categorias);
 }
