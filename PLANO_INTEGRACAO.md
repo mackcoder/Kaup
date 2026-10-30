@@ -124,8 +124,9 @@ O `API_CONTRACT_RASCUNHO.md` diz que o backend precisa aprovar o contrato. **Rec
 - `processingStatus` ∈ `pending|processing|completed|failed` (minúsculas).
 
 **Síncrono × assíncrono.** O frontend aceita os dois: a `useChat` faz polling enquanto o status for `pending/processing`. Porém `ApiService.upload` aguarda a resposta do POST com **timeout padrão de 20 s** (`VITE_API_TIMEOUT_MS`). OCR de até 20 páginas a 300 DPI + chamada ao Gemini pode passar disso.
-- *Decisão original:* síncrono, devolvendo `completed`, e subir `VITE_API_TIMEOUT_MS`. **Reaberta pela Fase 0:** os tempos medidos foram de 70 a 113 s (ver §7, Fase 0), então o timeout teria de passar de ~120 s.
-- *Recomendado agora:* `202 Accepted` + `@Async`/fila + polling (frontend já pronto: `useChat` consulta a análise a cada 2,5 s). Atende RD02/RD03. É mais código no backend (executor, status `processing`, tratamento de falha), mas sem isso o upload é inutilizável.
+- *Decisão (MVP):* síncrono, devolvendo `completed`, com `VITE_API_TIMEOUT_MS` um pouco acima do padrão (ex.: 60000) para absorver oscilações. Com o modelo `gemini-3.5-flash-lite` a Fase 0 mediu ~2 s por análise (§7, "Segunda rodada"); com o modelo anterior eram 70–180 s e o síncrono seria inviável.
+- *Pendente de medição:* PDFs escaneados longos. Se o OCR passar de ~15 s, migrar para `202 Accepted` + `@Async`/fila + polling (frontend já pronto: `useChat` consulta a análise a cada 2,5 s; atende RD02/RD03).
+- Adicionar timeout próprio no `RestClient` do `GeminiService` (hoje não há) para que um Gemini travado não prenda a requisição.
 
 **Frontend (ajustes)**
 - `http.ts`: ler o corpo de erro (`ProblemDetail.detail`) e usá-lo como mensagem (ver 4.8).
@@ -216,7 +217,7 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 
 ### Fase 0 — Alinhamento (executada em 2026-10-29)
 - [x] Aprovar o contrato de `frontend/API_CONTRACT_RASCUNHO.md` (caminhos, DTOs, nomes de campo) — aprovado
-- [~] Decidir: upload síncrono (MVP) ou 202 + polling — **decidido síncrono, mas a medição abaixo reabre a decisão**
+- [x] Decidir: upload síncrono (MVP) ou 202 + polling — **síncrono**. A primeira medição (com `gemini-3.8-flash`) reabriu a dúvida, mas a troca para `gemini-3.5-flash-lite` trouxe os tempos para ~2 s e confirmou o síncrono (ver "Segunda rodada")
 - [x] Categorias: usar as que já estão implementadas no frontend (`Carros/Casa/Trabalho/Banco/Outros`)
 - [x] Subir Postgres + backend com `GEMINI_API_KEY` válida e chamar `POST /api/analise/contrato` — funcionou (ver resultados)
 - [x] Confirmar que `gemini-3.8-flash` responde — **responde** (200 em `/contrato` e `/texto`)
@@ -239,7 +240,22 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 - **Gemini devolve 503 "high demand" de forma intermitente** (log do backend); o `ApiExceptionHandler` converte para 502 com a mensagem da exceção.
 - **O OCR errou um valor financeiro:** no PDF escaneado, "R$ 1.500,00" foi lido como "R$ 1.506,00" e a IA repetiu o valor errado no resumo. Foi uma página sintética a 200 DPI; fotos reais tendem a piorar. Isso importa para um produto cujo objetivo é mostrar valores corretos (hoje o backend não tem nenhum aviso de baixa confiança do OCR; ver `ocrQualityWarning` na §4.1, ponto 4).
 
-**Consequência para a Fase 1:** com 70–113 s por upload, o upload síncrono com timeout de 20 s **não funciona**, e subir o timeout do navegador para ~150 s seria uma péssima experiência (RD02/RD03 pedem feedback em 1 s). Opções a decidir: (a) `202 Accepted` + processamento assíncrono + polling, que o frontend já suporta (recomendado); (b) reduzir a latência do Gemini (outro modelo ou menos "thinking") — **não testado**; (c) manter síncrono com timeout alto, só para demonstração.
+**Primeira rodada — conclusão:** com `gemini-3.8-flash`, 70–113 s por upload (chamadas ao Gemini isoladas chegaram a 151–181 s com outra chave, além de 503 "alta demanda"). O upload síncrono com timeout de 20 s não funcionaria.
+
+**Segunda rodada — troca de modelo (2026-10-30).** Testes diretos na API do Gemini mostraram `gemini-3.5-flash-lite` e `gemini-3.1-flash-lite` respondendo em ~2 s; `gemini-2.5-flash` e `gemini-2.5-flash-lite` retornam 404 ("indisponível para novos usuários"). O padrão do backend passou a ser `gemini-3.5-flash-lite` (`application.properties`) e o `docker-compose.yml` repassa `GEMINI_MODEL` ao container. Reteste completo no backend reconstruído:
+
+| Caso | Resultado | Tempo |
+|---|---|---|
+| PNG (2 execuções) | 200, valor lido "R$ 1.500,00" | 2,7 s / 2,6 s |
+| JPEG | 200, "R$ 1.500,00" | 2,3 s |
+| PDF digital | 200, "R$ 1.500,00" | 1,8 s |
+| PDF escaneado (2 execuções) | 200, **"R$ 1.506,00"** (erro de OCR, igual nas duas) | 2,2 s / 2,5 s |
+| `.txt` / vazio / 11 MB | 400 / 400 / 413 | < 0,05 s |
+
+- **Upload síncrono viabilizado:** ~2 s de análise cabe com folga nos 20 s do frontend, para amostras de 1 página. **Não medido:** PDFs escaneados longos (até 20 páginas, 300 DPI, uma página por vez no Tesseract), onde o OCR pode passar a dominar o tempo. Medir antes de fechar o timeout; se passar de ~15 s, voltar a considerar `202` + polling.
+- **O PNG que não respondia na primeira rodada** respondeu em 2,7 s; a causa era o modelo lento, não o OCR de PNG.
+- **O erro de OCR ficou restrito ao caminho do PDF escaneado:** o mesmo conteúdo como PNG ou JPEG leu "R$ 1.500,00". A amostra de PDF escaneado foi gerada rasterizando um PDF digital a 200 DPI e o backend a re-renderiza a 300 DPI, então pode ser artefato do teste; **não confirmado** com um PDF escaneado de verdade. Mesmo assim, o risco de erro silencioso em valores justifica um aviso de baixa confiança (`ocrQualityWarning`, §4.1 ponto 4).
+- **Ressalva:** uma chamada por modelo no teste direto e poucas no backend; os modelos "lite" podem ser mais fracos em contratos longos ou cláusulas complicadas (qualidade do resumo **não avaliada**).
 
 ### Fase 1 — Upload → resumo
 - [ ] Backend: entidade `Documento` (+ relação com `Analise`) e repositório
@@ -294,7 +310,8 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 ## 8. Não verificado (fora do escopo da leitura ou sem evidência)
 
 - **Verificado na Fase 0 (2026-10-29):** o backend sobe no Docker, cria a tabela `analise`, e `/api/analise/contrato` funciona com JPEG, PDF digital e PDF escaneado; o modelo `gemini-3.8-flash` responde; erros 400/413 saem com mensagem em português. Detalhes e tempos em §7. **Continua não verificado:** os testes unitários (`mvn verify`), o PNG (estourou 120 s, sem resposta) e qualquer fluxo do frontend contra o backend.
-- Latência: 65–113 s por análise nas medições, mas é uma amostra pequena e o Gemini oscila (houve 503 intermitente); não sei se é típico.
+- Latência: ~2 s por análise com `gemini-3.5-flash-lite` (6 execuções + 3 do teste direto), contra 65–180 s com `gemini-3.8-flash`. Amostra pequena; o Gemini oscila (houve 503 intermitente no modelo antigo) e não sei se o "lite" mantém a latência em horários de maior demanda.
+- Qualidade do resumo do modelo "lite" em contratos reais/longos, e OCR de PDFs escaneados de verdade ou de várias páginas.
 - `features/chat/session.ts`, `pages/ChatPage.tsx`, `components/UploadDialog.tsx` (lidos só por `grep`): comportamento exato em modo API, incluindo `stageFromHistory` e o ramo `service.mode`.
 - Conteúdo de `backend/config/init.sql` (a leitura não mostrou conteúdo relevante; não confirmado), `Tess4jConfig.java`, workflow de CI (`ACTIONS`) e `Dockerfile` do backend.
 - `docs/Arquitetura_Software/Projeto_Arquitetural.md` (só `grep`), `UseCasesExplicacao.md`, `WireFrame.md`, jornadas e personas — não lidos; a lista de requisitos veio de `Requirements.md`.
