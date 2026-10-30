@@ -1,6 +1,8 @@
 package com.kaup.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -333,5 +335,15 @@ class DocumentoServiceTest {
 
         // A renda existe no perfil, mas o serviço a repassa à camada de IA, que decide não usá-la na análise.
         verify(analiseService).analisarArquivo(contrato, new PreferenciasDeIA("complete", "entre R$ 3.000 e R$ 5.000"));
+    }
+
+    @Test
+    void ownedByMeDizSeODocumentoEDeQuemConsulta() {
+        Documento meu = documentoDe(usuario.id());
+        Documento alheio = documentoDe(UUID.randomUUID());
+
+        assertTrue(service.buscar(meu.getId().toString(), usuario).ownedByMe());
+        // O administrador lê o documento de outra pessoa, mas não é o dono dele.
+        assertFalse(service.buscar(alheio.getId().toString(), admin).ownedByMe());
     }
 }

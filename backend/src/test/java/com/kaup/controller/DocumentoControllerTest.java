@@ -51,7 +51,7 @@ class DocumentoControllerTest {
 
     private DocumentoResponse documento() {
         return new DocumentoResponse(ID, "contrato.pdf", null, "completed",
-                Instant.parse("2026-10-30T12:00:00Z"), "Contrato de aluguel.", "warning");
+                Instant.parse("2026-10-30T12:00:00Z"), "Contrato de aluguel.", "warning", true);
     }
 
     private MockMultipartFile arquivo() {

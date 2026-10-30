@@ -11,6 +11,8 @@ import java.time.Instant;
  * @param processingStatus pending, processing, completed ou failed
  * @param description      primeira frase do resumo, ou nulo
  * @param visualStatus     "ok" ou "warning"
+ * @param ownedByMe        falso quando quem consulta (o administrador) não é o dono: o frontend
+ *                         esconde as ações que só o dono pode fazer
  */
 public record DocumentoResponse(
         String id,
@@ -19,4 +21,5 @@ public record DocumentoResponse(
         String processingStatus,
         Instant createdAt,
         String description,
-        String visualStatus) { }
+        String visualStatus,
+        boolean ownedByMe) { }

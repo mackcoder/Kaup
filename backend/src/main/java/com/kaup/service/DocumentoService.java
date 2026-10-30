@@ -73,7 +73,7 @@ public class DocumentoService {
         documento.setTextoExtraido(resultado.textoExtraido());
         documento.setAnaliseJson(resultado.analise().toString());
         documento.setDono(usuarios.getReferenceById(usuario.id()));
-        return paraDocumentoResponse(repository.save(documento));
+        return paraDocumentoResponse(repository.save(documento), usuario);
     }
 
     /** O administrador vê os documentos de todos; as demais pessoas, só os próprios. */
@@ -82,12 +82,12 @@ public class DocumentoService {
         List<Documento> documentos = usuario.isAdmin()
                 ? repository.findAllByOrderByCriadoEmDesc()
                 : repository.findByDonoIdOrderByCriadoEmDesc(usuario.id());
-        return documentos.stream().map(this::paraDocumentoResponse).toList();
+        return documentos.stream().map(d -> paraDocumentoResponse(d, usuario)).toList();
     }
 
     @Transactional(readOnly = true)
     public DocumentoResponse buscar(String id, UsuarioLogado usuario) {
-        return paraDocumentoResponse(obterParaLeitura(id, usuario));
+        return paraDocumentoResponse(obterParaLeitura(id, usuario), usuario);
     }
 
     @Transactional(readOnly = true)
@@ -154,7 +154,7 @@ public class DocumentoService {
         return usuarios.findById(usuario.id()).map(PreferenciasDeIA::de).orElse(PreferenciasDeIA.PADRAO);
     }
 
-    private DocumentoResponse paraDocumentoResponse(Documento documento) {
+    private DocumentoResponse paraDocumentoResponse(Documento documento, UsuarioLogado usuario) {
         JsonNode analise = lerAnalise(documento);
         return new DocumentoResponse(
                 documento.getId().toString(),
@@ -163,7 +163,8 @@ public class DocumentoService {
                 documento.getProcessingStatus(),
                 documento.getCriadoEm(),
                 AnaliseMapper.descricao(analise),
-                AnaliseMapper.visualStatus(analise));
+                AnaliseMapper.visualStatus(analise),
+                ehDono(documento, usuario));
     }
 
     // Um JSON ilegível no banco não deve derrubar a listagem inteira: trata como análise vazia.
