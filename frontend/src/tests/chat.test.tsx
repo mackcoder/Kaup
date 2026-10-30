@@ -402,6 +402,38 @@ describe("chat API sem roteiro fictício", () => {
     });
     return service;
   }
+  it("mantém o card de resumo no topo mesmo quando o servidor já tem histórico", async () => {
+    mount(remoteService(), "/documentos/real/chat");
+    await advance();
+    const card = screen.getByText("ANÁLISE INICIAL");
+    const mensagem = screen.getByText("Qual cláusula deseja entender?");
+    // O card vem antes da mensagem do servidor na tela.
+    expect(
+      card.compareDocumentPosition(mensagem) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+  it("preserva os parágrafos da resposta da IA (linha em branco antes de 'Minha opinião:')", async () => {
+    const service = remoteService();
+    vi.spyOn(service, "getMessages").mockResolvedValue([
+      {
+        id: "1",
+        documentId: "real",
+        role: "ai",
+        kind: "text",
+        text: "O contrato diz isso.\n\nMinha opinião: parece comum.",
+      },
+    ]);
+    mount(service, "/documentos/real/chat");
+    await advance();
+    expect(screen.getByText(/Minha opinião: parece comum/)).toHaveStyle({
+      whiteSpace: "pre-wrap",
+    });
+  });
+  it("limita o campo de pergunta ao tamanho que o backend aceita", async () => {
+    mount(remoteService(), "/documentos/real/chat");
+    await advance();
+    expect(composer()).toHaveAttribute("maxlength", "2000");
+  });
   it("preserva a pergunta do servidor e falha/retry HTTP sem opções, respostas ou aviso locais", async () => {
     const service = remoteService();
     const fetcher = vi

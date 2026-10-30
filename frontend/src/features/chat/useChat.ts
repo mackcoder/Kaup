@@ -81,16 +81,20 @@ export function useChat(doc: DocumentView) {
               ),
             );
           } else {
-            const messages: ChatMessage[] = history.length
-              ? history
-              : [
-                  {
-                    id: `summary-${doc.id}`,
-                    documentId: doc.id,
-                    role: "ai",
-                    kind: "summary-card",
-                  },
-                ];
+            const summary: ChatMessage = {
+              id: `summary-${doc.id}`,
+              documentId: doc.id,
+              role: "ai",
+              kind: "summary-card",
+            };
+            // O histórico do servidor só tem as mensagens da conversa; no modo API o card
+            // de resumo fica sempre no topo, senão sumiria depois da primeira pergunta.
+            const messages: ChatMessage[] =
+              service.mode === "api"
+                ? [summary, ...history]
+                : history.length
+                  ? history
+                  : [summary];
             store.update({
               messages,
               stage: stageFromHistory(service.mode, history),

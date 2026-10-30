@@ -135,7 +135,10 @@ export default function MessageList({
             >
               <span
                 className="kaup-173"
-                style={{ color: isUser ? "#fff" : "#1e293b" }}
+                style={{
+                  color: isUser ? "#fff" : "#1e293b",
+                  whiteSpace: "pre-wrap", // a IA separa parágrafos com linha em branco
+                }}
               >
                 {msg.text}
                 {msg.state === "failed" && (
