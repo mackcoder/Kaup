@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -33,13 +34,14 @@ import com.kaup.entity.Papel;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
 import com.kaup.exception.EmailJaCadastradoException;
+import com.kaup.security.LimiteDeTentativas;
 import com.kaup.security.SecurityConfig;
 import com.kaup.security.UsuarioLogado;
 import com.kaup.service.ContaService;
 
 /** Usa a cadeia de segurança de verdade (SecurityConfig): sessão, CSRF e respostas 401/403. */
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, LimiteDeTentativas.class})
 class AuthControllerTest {
 
     private static final UUID ID = UUID.fromString("3f2a9c1e-5b7d-4c8a-9e0f-1a2b3c4d5e6f");
@@ -54,10 +56,17 @@ class AuthControllerTest {
     @MockBean
     private UserDetailsService usuarios;
 
+    // O limitador é de verdade e vive no contexto de teste, compartilhado entre os testes.
+    @Autowired
+    private LimiteDeTentativas limite;
+
     private Usuario ana;
 
     @BeforeEach
     void preparar() {
+        for (String email : new String[] {"ana@exemplo.com", "outra@exemplo.com", "nao-existe@exemplo.com"}) {
+            limite.acertou("entrar:" + email);
+        }
         ana = new Usuario();
         ReflectionTestUtils.setField(ana, "id", ID);
         ana.setNome("Ana Souza");
@@ -173,5 +182,39 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/sair").with(comCsrf()).session(sessao)).andExpect(status().isNoContent());
 
         mockMvc.perform(get("/api/auth/eu").session(sessao)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void cincoSenhasErradasBloqueiamOLoginPorUmInstanteInclusiveComASenhaCerta() throws Exception {
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/auth/entrar").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                            .content(json("ana@exemplo.com", "errada123")))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/auth/entrar").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("ANA@exemplo.com", SENHA)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"))
+                .andExpect(jsonPath("$.detail").value("Muitas tentativas. Aguarde alguns segundos e tente de novo."));
+
+        // outro e-mail não é afetado
+        mockMvc.perform(post("/api/auth/entrar").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content(json("outra@exemplo.com", "qualquer123")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void loginCertoZeraAContagemDeErros() throws Exception {
+        for (int rodada = 0; rodada < 3; rodada++) {
+            for (int i = 0; i < 4; i++) {
+                mockMvc.perform(post("/api/auth/entrar").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                                .content(json("ana@exemplo.com", "errada123")))
+                        .andExpect(status().isUnauthorized());
+            }
+            mockMvc.perform(post("/api/auth/entrar").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                            .content(json("ana@exemplo.com", SENHA)))
+                    .andExpect(status().isOk());
+        }
     }
 }

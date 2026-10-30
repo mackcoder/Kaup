@@ -1,7 +1,9 @@
 package com.kaup.exception;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -24,6 +26,14 @@ public class ApiExceptionHandler {
                 ? "E-mail ou senha incorretos."
                 : "Entre na sua conta para continuar.";
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, detalhe);
+    }
+
+    // Retry-After diz ao navegador (e a quem chama a API) quantos segundos esperar.
+    @ExceptionHandler(MuitasTentativasException.class)
+    public ResponseEntity<ProblemDetail> muitasTentativas(MuitasTentativasException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getSegundos()))
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
     @ExceptionHandler(OperacaoNaoPermitidaException.class)

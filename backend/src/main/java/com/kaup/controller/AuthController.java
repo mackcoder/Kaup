@@ -6,6 +6,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,6 +23,7 @@ import com.kaup.dto.CadastroRequest;
 import com.kaup.dto.LoginRequest;
 import com.kaup.dto.UsuarioResponse;
 import com.kaup.entity.Usuario;
+import com.kaup.security.LimiteDeTentativas;
 import com.kaup.security.UsuarioLogado;
 import com.kaup.service.ContaService;
 
@@ -36,12 +38,14 @@ public class AuthController {
     private final ContaService contaService;
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository contextos;
+    private final LimiteDeTentativas limite;
 
     public AuthController(ContaService contaService, AuthenticationManager authenticationManager,
-                          SecurityContextRepository contextos) {
+                          SecurityContextRepository contextos, LimiteDeTentativas limite) {
         this.contaService = contaService;
         this.authenticationManager = authenticationManager;
         this.contextos = contextos;
+        this.limite = limite;
     }
 
     /** Cria a conta e já deixa a pessoa logada. */
@@ -60,7 +64,17 @@ public class AuthController {
         if (pedido.email() == null || pedido.password() == null) {
             throw new BadCredentialsException("Credenciais ausentes.");
         }
-        Authentication autenticacao = abrirSessao(pedido.email(), pedido.password(), request, response);
+        // Bloqueado, nem a senha certa entra: senão dava para testar senhas durante o bloqueio.
+        String chave = "entrar:" + ContaService.normalizarEmail(pedido.email());
+        limite.verificar(chave);
+        Authentication autenticacao;
+        try {
+            autenticacao = abrirSessao(pedido.email(), pedido.password(), request, response);
+        } catch (AuthenticationException e) {
+            limite.falhou(chave);
+            throw e;
+        }
+        limite.acertou(chave);
         UsuarioLogado logado = (UsuarioLogado) autenticacao.getPrincipal();
         return UsuarioResponse.de(contaService.buscar(logado.id())
                 .orElseThrow(() -> new BadCredentialsException("Conta não encontrada.")));
