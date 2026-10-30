@@ -61,7 +61,8 @@ public class SecurityConfig {
             .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
             .securityContext(contexto -> contexto.securityContextRepository(contextos))
             .authorizeHttpRequests(regras -> regras
-                .requestMatchers("/api/analise/health", "/api/auth/cadastro", "/api/auth/entrar", "/error")
+                .requestMatchers("/api/analise/health", "/api/auth/cadastro", "/api/auth/entrar",
+                        "/api/auth/recuperar/solicitar", "/api/auth/recuperar/redefinir", "/error")
                     .permitAll()
                 .anyRequest().authenticated())
             .exceptionHandling(erros -> erros

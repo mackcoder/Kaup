@@ -21,11 +21,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.kaup.dto.CadastroRequest;
 import com.kaup.dto.LoginRequest;
+import com.kaup.dto.RecuperarSenhaRequest;
+import com.kaup.dto.RedefinirSenhaRequest;
 import com.kaup.dto.UsuarioResponse;
 import com.kaup.entity.Usuario;
 import com.kaup.security.LimiteDeTentativas;
 import com.kaup.security.UsuarioLogado;
 import com.kaup.service.ContaService;
+import com.kaup.service.RecuperacaoDeSenhaService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,13 +42,16 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final SecurityContextRepository contextos;
     private final LimiteDeTentativas limite;
+    private final RecuperacaoDeSenhaService recuperacao;
 
     public AuthController(ContaService contaService, AuthenticationManager authenticationManager,
-                          SecurityContextRepository contextos, LimiteDeTentativas limite) {
+                          SecurityContextRepository contextos, LimiteDeTentativas limite,
+                          RecuperacaoDeSenhaService recuperacao) {
         this.contaService = contaService;
         this.authenticationManager = authenticationManager;
         this.contextos = contextos;
         this.limite = limite;
+        this.recuperacao = recuperacao;
     }
 
     /** Cria a conta e já deixa a pessoa logada. */
@@ -78,6 +84,22 @@ public class AuthController {
         UsuarioLogado logado = (UsuarioLogado) autenticacao.getPrincipal();
         return UsuarioResponse.de(contaService.buscar(logado.id())
                 .orElseThrow(() -> new BadCredentialsException("Conta não encontrada.")));
+    }
+
+    /**
+     * Primeiro passo da recuperação de senha. Ainda não envia e-mail (o código é fixo, ver
+     * RecuperacaoDeSenhaService) e responde igual para qualquer e-mail, tenha conta ou não.
+     */
+    @PostMapping("/recuperar/solicitar")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void solicitarRecuperacao(@RequestBody RecuperarSenhaRequest pedido) {
+        // Nada a fazer enquanto não houver e-mail real; o endpoint existe para o contrato já ser o final.
+    }
+
+    @PostMapping("/recuperar/redefinir")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void redefinirSenha(@RequestBody RedefinirSenhaRequest pedido) {
+        recuperacao.redefinir(pedido);
     }
 
     @PostMapping("/sair")

@@ -2,6 +2,9 @@ package com.kaup.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -38,6 +41,7 @@ import com.kaup.security.LimiteDeTentativas;
 import com.kaup.security.SecurityConfig;
 import com.kaup.security.UsuarioLogado;
 import com.kaup.service.ContaService;
+import com.kaup.service.RecuperacaoDeSenhaService;
 
 /** Usa a cadeia de segurança de verdade (SecurityConfig): sessão, CSRF e respostas 401/403. */
 @WebMvcTest(AuthController.class)
@@ -55,6 +59,9 @@ class AuthControllerTest {
 
     @MockBean
     private UserDetailsService usuarios;
+
+    @MockBean
+    private RecuperacaoDeSenhaService recuperacao;
 
     // O limitador é de verdade e vive no contexto de teste, compartilhado entre os testes.
     @Autowired
@@ -216,5 +223,44 @@ class AuthControllerTest {
                             .content(json("ana@exemplo.com", SENHA)))
                     .andExpect(status().isOk());
         }
+    }
+
+    @Test
+    void solicitarRecuperacaoRespondeIgualParaQualquerEmailESemLogin() throws Exception {
+        for (String email : new String[] {"ana@exemplo.com", "ninguem@exemplo.com"}) {
+            mockMvc.perform(post("/api/auth/recuperar/solicitar").with(comCsrf())
+                            .contentType(MediaType.APPLICATION_JSON).content("{\"email\":\"" + email + "\"}"))
+                    .andExpect(status().isNoContent());
+        }
+    }
+
+    @Test
+    void redefinirSenhaEhPublicoEEncaminhaAoServico() throws Exception {
+        mockMvc.perform(post("/api/auth/recuperar/redefinir").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ana@exemplo.com\",\"code\":\"676869\","
+                                + "\"password\":\"novasenha1\",\"confirmPassword\":\"novasenha1\"}"))
+                .andExpect(status().isNoContent());
+
+        verify(recuperacao).redefinir(any());
+    }
+
+    @Test
+    void redefinirSenhaComCodigoInvalidoRetorna400() throws Exception {
+        doThrow(new DadosInvalidosException("Código inválido. Confira o e-mail e o código e tente de novo."))
+                .when(recuperacao).redefinir(any());
+
+        mockMvc.perform(post("/api/auth/recuperar/redefinir").with(comCsrf()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ana@exemplo.com\",\"code\":\"1\",\"password\":\"x\",\"confirmPassword\":\"x\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Código inválido. Confira o e-mail e o código e tente de novo."));
+    }
+
+    @Test
+    void redefinirSenhaSemTokenCsrfEhRecusado() throws Exception {
+        mockMvc.perform(post("/api/auth/recuperar/redefinir").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"ana@exemplo.com\"}"))
+                .andExpect(status().isForbidden());
+
+        verify(recuperacao, never()).redefinir(any());
     }
 }
