@@ -127,7 +127,7 @@ export default function UploadDialog({
           <p className="demo-copy">
             {service.mode === "mock"
               ? "Demonstração: o arquivo não sai do navegador. Não haverá OCR nem análise real."
-              : "Envio ao Spring Boot. Upload e processamento dependem dos endpoints propostos."}
+              : "O arquivo é lido no servidor para gerar o resumo. Isso pode levar alguns segundos."}
           </p>
           <button
             className="primary-button wide"

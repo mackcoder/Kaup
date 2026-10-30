@@ -37,6 +37,49 @@ describe("adapter HTTP sem fallback", () => {
       "ainda não foi implementado",
     );
   });
+  it("mostra a mensagem que o backend escreveu para o usuário (ProblemDetail)", async () => {
+    const problem = {
+      type: "about:blank",
+      title: "Bad Request",
+      status: 400,
+      detail: "Formato não suportado. Envie PDF, PNG ou JPEG.",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify(problem), { status: 400 }),
+        ),
+    );
+    await expect(new ApiService().listDocuments()).rejects.toThrow(
+      "Formato não suportado. Envie PDF, PNG ou JPEG.",
+    );
+  });
+  it("404 com mensagem do backend mostra a mensagem, não 'não implementado'", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ detail: "Documento não encontrado." }), {
+          status: 404,
+        }),
+      ),
+    );
+    await expect(new ApiService().getDocument("x")).rejects.toThrow(
+      "Documento não encontrado.",
+    );
+  });
+  it("erro sem corpo JSON usa a mensagem padrão com o código HTTP", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(new Response("<html>erro</html>", { status: 502 })),
+    );
+    await expect(new ApiService().listDocuments()).rejects.toThrow(
+      "A API retornou erro 502",
+    );
+  });
   it("rejeita schemas remotos incompletos", async () => {
     vi.stubGlobal(
       "fetch",

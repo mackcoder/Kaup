@@ -7,6 +7,20 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+/** Mensagem que o backend escreveu para o usuário: `detail` (RFC 7807) ou `message`. */
+async function errorDetail(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === "object") {
+      const { detail, message } = body as Record<string, unknown>;
+      for (const text of [detail, message])
+        if (typeof text === "string" && text.trim()) return text;
+    }
+  } catch {
+    // Sem corpo ou fora de JSON: quem chama usa a mensagem padrão.
+  }
+  return null;
+}
 export function createHttp(baseUrl: string, timeoutMs = 20000) {
   return async function request(
     path: string,
@@ -31,9 +45,10 @@ export function createHttp(baseUrl: string, timeoutMs = 20000) {
       });
       if (!response.ok)
         throw new ApiError(
-          response.status === 404 || response.status === 501
-            ? `API indisponível: ${path} ainda não foi implementado ou configurado no backend.`
-            : `A API retornou erro ${response.status}. Tente novamente.`,
+          (await errorDetail(response)) ??
+            (response.status === 404 || response.status === 501
+              ? `API indisponível: ${path} ainda não foi implementado ou configurado no backend.`
+              : `A API retornou erro ${response.status}. Tente novamente.`),
           response.status,
         );
       if (response.status === 204) return undefined;
