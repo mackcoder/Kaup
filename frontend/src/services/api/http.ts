@@ -7,19 +7,46 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
-/** Mensagem que o backend escreveu para o usuário: `detail` (RFC 7807) ou `message`. */
-async function errorDetail(response: Response): Promise<string | null> {
+/**
+ * O que o corpo de uma resposta de erro revela: a mensagem que o backend escreveu para o
+ * usuário (`detail` do RFC 7807 ou `message`) e se o corpo veio vazio.
+ */
+async function errorInfo(
+  response: Response,
+): Promise<{ detail: string | null; empty: boolean }> {
+  let raw = "";
   try {
-    const body: unknown = await response.json();
+    raw = await response.text();
+  } catch {
+    // Corpo ilegível: trata como ausente.
+  }
+  if (!raw.trim()) return { detail: null, empty: true };
+  try {
+    const body: unknown = JSON.parse(raw);
     if (body && typeof body === "object") {
       const { detail, message } = body as Record<string, unknown>;
       for (const text of [detail, message])
-        if (typeof text === "string" && text.trim()) return text;
+        if (typeof text === "string" && text.trim())
+          return { detail: text, empty: false };
     }
   } catch {
-    // Sem corpo ou fora de JSON: quem chama usa a mensagem padrão.
+    // Fora de JSON: quem chama usa a mensagem padrão.
   }
-  return null;
+  return { detail: null, empty: false };
+}
+/** Erro 5xx sem corpo: é o proxy ou o servidor de frontend sem ninguém do outro lado. */
+const backendForaDoAr = (status: number) =>
+  `Não foi possível falar com o servidor (erro ${status}). Confira se o backend está rodando e tente novamente.`;
+function errorMessage(
+  path: string,
+  status: number,
+  { detail, empty }: { detail: string | null; empty: boolean },
+) {
+  if (detail) return detail;
+  if (status === 404 || status === 501)
+    return `API indisponível: ${path} ainda não foi implementado ou configurado no backend.`;
+  if (empty && status >= 500) return backendForaDoAr(status);
+  return `A API retornou erro ${status}. Tente novamente.`;
 }
 export function createHttp(baseUrl: string, timeoutMs = 20000) {
   return async function request(
@@ -45,10 +72,7 @@ export function createHttp(baseUrl: string, timeoutMs = 20000) {
       });
       if (!response.ok)
         throw new ApiError(
-          (await errorDetail(response)) ??
-            (response.status === 404 || response.status === 501
-              ? `API indisponível: ${path} ainda não foi implementado ou configurado no backend.`
-              : `A API retornou erro ${response.status}. Tente novamente.`),
+          errorMessage(path, response.status, await errorInfo(response)),
           response.status,
         );
       if (response.status === 204) return undefined;

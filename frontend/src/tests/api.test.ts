@@ -80,6 +80,33 @@ describe("adapter HTTP sem fallback", () => {
       "A API retornou erro 502",
     );
   });
+  it("5xx sem corpo (proxy sem backend) orienta a conferir se o backend está rodando", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("", { status: 500 })),
+    );
+    await expect(new ApiService().listDocuments()).rejects.toThrow(
+      "Confira se o backend está rodando",
+    );
+  });
+  it("500 real do servidor (com corpo JSON sem mensagem) não diz que o backend está fora do ar", async () => {
+    const corpo = {
+      timestamp: "2026-10-30",
+      status: 500,
+      error: "Internal Server Error",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify(corpo), { status: 500 }),
+        ),
+    );
+    await expect(new ApiService().listDocuments()).rejects.toThrow(
+      "A API retornou erro 500",
+    );
+  });
   it("rejeita schemas remotos incompletos", async () => {
     vi.stubGlobal(
       "fetch",
