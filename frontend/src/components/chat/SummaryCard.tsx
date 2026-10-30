@@ -50,16 +50,9 @@ export default function SummaryCard({
           <span className="kaup-178">{row.value}</span>
         </div>
       ))}
-      {!analysis?.demo &&
-        analysis?.keyPoints.map((point) => (
-          <div key={point.id} className="analysis-point">
-            <strong>{point.title}</strong>
-            <p>{point.description}</p>
-          </div>
-        ))}
       <div className="kaup-185">
         <span className="kaup-186">💡</span>
-        <span className="kaup-134">
+        <span className="kaup-134" style={{ whiteSpace: "pre-line" }}>
           {analysis?.ocrQualityWarning ??
             (analysis?.demo && analysis.facts?.length
               ? analysis.keyPoints[0]?.description

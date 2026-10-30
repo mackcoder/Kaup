@@ -30,6 +30,35 @@ export default function MessageList({
       {messages.map((msg) => {
         const isUser = msg.role === "user";
 
+        if (msg.kind === "summary-card" && !analysis?.demo) {
+          // Análise real: o resumo chega como mensagem da IA, igual ao resto da conversa.
+          const texto = analysis?.ocrQualityWarning ?? analysis?.summary;
+          return (
+            <div
+              key={msg.id}
+              className="kaup-171"
+              style={{ justifyContent: "flex-start" }}
+            >
+              <div
+                className="kaup-172"
+                style={{
+                  borderRadius: "5px 18px 18px 18px",
+                  background: "#fff",
+                  border: "1.5px solid #e2e8f0",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+                }}
+              >
+                <span
+                  className="kaup-173"
+                  style={{ color: "#1e293b", whiteSpace: "pre-wrap" }}
+                >
+                  {texto ?? "Resumo ainda não disponível."}
+                </span>
+              </div>
+            </div>
+          );
+        }
+
         if (msg.kind === "summary-card") {
           return (
             <div key={msg.id} className="kaup-163">

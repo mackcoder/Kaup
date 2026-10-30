@@ -410,10 +410,10 @@ describe("chat API sem roteiro fictício", () => {
     });
     return service;
   }
-  it("mantém o card de resumo no topo mesmo quando o servidor já tem histórico", async () => {
+  it("mantém o resumo no topo mesmo quando o servidor já tem histórico", async () => {
     mount(remoteService(), "/documentos/real/chat");
     await advance();
-    const card = screen.getByText("ANÁLISE INICIAL");
+    const card = screen.getByText("Resumo retornado pelo servidor");
     const mensagem = screen.getByText("Qual cláusula deseja entender?");
     // O card vem antes da mensagem do servidor na tela.
     expect(
