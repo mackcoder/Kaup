@@ -3,6 +3,7 @@ import type {
   UserProfile,
   ContextFile,
   RegisterInput,
+  ResetPasswordInput,
 } from "../../types/domain";
 import { createHttp, ApiError } from "./http";
 import { endpoints as e } from "./endpoints";
@@ -55,6 +56,25 @@ export class ApiService implements KaupService {
   }
   async logout(signal?: AbortSignal) {
     await this.request(e.logout, { method: "POST", signal });
+  }
+  async requestPasswordReset(email: string, signal?: AbortSignal) {
+    await this.request(e.resetRequest, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+      signal,
+    });
+  }
+  async resetPassword(input: ResetPasswordInput, signal?: AbortSignal) {
+    await this.request(e.resetConfirm, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+      signal,
+    });
+  }
+  async exportData(signal?: AbortSignal) {
+    return await this.request(e.export, { signal });
   }
   async deleteAccount(signal?: AbortSignal) {
     await this.request(e.account, { method: "DELETE", signal });

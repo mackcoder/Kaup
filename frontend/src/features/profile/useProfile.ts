@@ -26,8 +26,15 @@ export function useProfile({
     logout,
     deleteAccount,
   } = useApp();
-  const { name, email, fontSize, explainLevel, income, shareIncomeWithAi } =
-    profile;
+  const {
+    name,
+    email,
+    fontSize,
+    explainLevel,
+    income,
+    shareIncomeWithAi,
+    retentionDays,
+  } = profile;
   const setFontSize = (fontSize: FontSize) => void saveProfile({ fontSize });
   const setExplainLevel = (explainLevel: ExplainLevel) =>
     void saveProfile({ explainLevel });
@@ -51,6 +58,8 @@ export function useProfile({
   const [helpMsg, setHelpMsg] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [accountBusy, setAccountBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
 
   // Tap feedback
   const [tapped, setTapped] = useState<string | null>(null);
@@ -122,6 +131,35 @@ export function useProfile({
       setAccountError(errorMessage(e));
       setAccountBusy(false);
     }
+  }
+
+  // Baixa um arquivo JSON com tudo o que o sistema guarda da conta (o navegador salva em Downloads).
+  async function downloadMyData() {
+    if (exporting) return;
+    setExporting(true);
+    setExportMsg(null);
+    try {
+      const data = await service.exportData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "kaup-meus-dados.json";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportMsg(
+        service.mode === "mock"
+          ? "Arquivo de demonstração baixado (nenhum dado real)."
+          : "Pronto! O arquivo kaup-meus-dados.json foi baixado.",
+      );
+    } catch (e) {
+      setExportMsg(errorMessage(e));
+    }
+    setExporting(false);
   }
 
   const docStats = [
@@ -281,6 +319,10 @@ export function useProfile({
     setLoggedOut,
     helpMsg,
     setHelpMsg,
+    retentionDays,
+    exporting,
+    exportMsg,
+    downloadMyData,
     tapped,
     fs,
     tap,

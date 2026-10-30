@@ -26,6 +26,7 @@ export const perfil: UserProfile = {
   income: "prefer_not",
   audio: false,
   shareIncomeWithAi: true,
+  retentionDays: 180,
 };
 export const documento: KaupDocument = {
   id: "real",

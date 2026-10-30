@@ -4,6 +4,10 @@ export default function PrivacyHelp({ model }: { model: ProfileModel }) {
     setShowDeleteConfirm,
     helpMsg,
     setHelpMsg,
+    retentionDays,
+    exporting,
+    exportMsg,
+    downloadMyData,
     tapped,
     fs,
     tap,
@@ -28,10 +32,7 @@ export default function PrivacyHelp({ model }: { model: ProfileModel }) {
                   tap(item.key, () => {
                     if (item.key === "docs" || item.key === "history")
                       onOpenAllDocs("all");
-                    else
-                      setHelpMsg(
-                        "Exportação de dados ainda não disponível nesta demonstração.",
-                      );
+                    else void downloadMyData();
                   });
                 }
               }}
@@ -57,7 +58,9 @@ export default function PrivacyHelp({ model }: { model: ProfileModel }) {
                       : "#1e293b",
                   }}
                 >
-                  {item.title}
+                  {item.key === "download" && exporting
+                    ? "Preparando o arquivo..."
+                    : item.title}
                 </div>
                 <div className="kaup-217" style={{ fontSize: fs(12) }}>
                   {item.sub}
@@ -69,6 +72,17 @@ export default function PrivacyHelp({ model }: { model: ProfileModel }) {
             </button>
           ))}
         </div>
+        {exportMsg && (
+          <p role="status" className="privacy-note">
+            {exportMsg}
+          </p>
+        )}
+        {retentionDays > 0 && (
+          <p className="privacy-note" style={{ fontSize: fs(13) }}>
+            🗓️ Por segurança, seus documentos e conversas são apagados depois de{" "}
+            {retentionDays} dias. Baixe uma cópia se quiser guardá-los.
+          </p>
+        )}
       </div>
 
       {/* ── HELP ── */}

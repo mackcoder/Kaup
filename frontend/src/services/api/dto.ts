@@ -141,6 +141,11 @@ export function profileFromDTO(value: unknown): UserProfile {
     income: p.income as UserProfile["income"],
     audio: p.audio,
     shareIncomeWithAi: p.shareIncomeWithAi,
+    // Só informa o prazo na tela: se faltar, apenas some o aviso (não vale recusar o perfil por isso).
+    retentionDays:
+      typeof p.retentionDays === "number" && p.retentionDays > 0
+        ? Math.floor(p.retentionDays)
+        : 0,
   };
 }
 export function authUserFromDTO(value: unknown): AuthUser {

@@ -370,6 +370,33 @@ button:disabled {
   color: var(--kaup-blue);
   font-weight: 900;
 }
+.auth-note {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 14px;
+}
+.privacy-note {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #475569;
+}
+.auth-link {
+  padding: 0;
+  font: inherit;
+  font-weight: 900;
+  color: var(--kaup-blue);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
 /* ── Perfil: aviso do administrador e interruptor da renda ── */
 .admin-badge {
   margin-top: 8px;

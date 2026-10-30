@@ -59,6 +59,9 @@ export default function LoginPage() {
         </button>
       </form>
       <p className="auth-switch">
+        <Link to="/esqueci-senha">Esqueci minha senha</Link>
+      </p>
+      <p className="auth-switch">
         Ainda não tem conta? <Link to="/cadastro">Criar conta</Link>
       </p>
     </AuthLayout>

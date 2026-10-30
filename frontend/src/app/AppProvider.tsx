@@ -28,6 +28,7 @@ const emptyProfile: UserProfile = {
   income: "prefer_not",
   audio: false,
   shareIncomeWithAi: true,
+  retentionDays: 0,
 };
 interface AppState {
   service: KaupService;

@@ -20,6 +20,7 @@ import type {
   KaupDocument,
   UserProfile,
   AuthUser,
+  ResetPasswordInput,
 } from "../../types/domain";
 const months = [
   "jan",
@@ -63,6 +64,7 @@ export class MockService implements KaupService {
     income: "prefer_not",
     audio: false,
     shareIncomeWithAi: true,
+    retentionDays: 180,
   };
   // A demonstração não tem contas: há sempre alguém "logado" e sair é só uma simulação na tela.
   onUnauthorized: (() => void) | null = null;
@@ -82,6 +84,21 @@ export class MockService implements KaupService {
     return structuredClone(this.demoUser);
   }
   async logout() {}
+  async requestPasswordReset() {}
+  async resetPassword(input: ResetPasswordInput) {
+    if (input.code.trim() !== "676869")
+      throw new Error(
+        "Código inválido. Confira o e-mail e o código e tente de novo.",
+      );
+  }
+  async exportData() {
+    return {
+      demo: true,
+      aviso: "Arquivo de demonstração: nenhum dado real foi exportado.",
+      account: structuredClone(this.demoUser),
+      documents: structuredClone(this.docs),
+    };
+  }
   async deleteAccount() {}
   async listDocuments() {
     return structuredClone(this.docs);

@@ -17,6 +17,7 @@ import ChatPage from "../pages/ChatPage";
 import ProfilePage from "../pages/ProfilePage";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
 import ResourceState from "../components/ResourceState";
 import type { DocumentView, FilterKey } from "../types/domain";
 function useActions() {
@@ -149,6 +150,7 @@ export default function App() {
         {modeLabel}
         <Routes>
           <Route path="/cadastro" element={<RegisterPage />} />
+          <Route path="/esqueci-senha" element={<ForgotPasswordPage />} />
           <Route path="*" element={<LoginPage />} />
         </Routes>
       </>
@@ -159,6 +161,7 @@ export default function App() {
       <Routes>
         <Route path="/entrar" element={<Navigate to="/" replace />} />
         <Route path="/cadastro" element={<Navigate to="/" replace />} />
+        <Route path="/esqueci-senha" element={<Navigate to="/" replace />} />
         <Route
           path="/"
           element={
