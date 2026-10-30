@@ -64,22 +64,16 @@ Through this project, we expect to **put our *Software Engineering* knowledge in
 
 ## 🛠️ Running locally (development)
 
-Requirements: Docker with Compose, and Node 22+. You also need a Gemini API key.
+Requirements: Docker with Compose, Node 22+ and a Gemini API key. Full step-by-step (install from scratch, Linux/WSL/Mac/Windows/Codespaces, troubleshooting) in **[RODAR.md](RODAR.md)**. Short version, from the repository root:
 
 ```bash
-# 1. Configure the secrets (the .env file is ignored by git)
-cp .env.example .env          # then fill in GEMINI_API_KEY
-
-# 2. Backend + PostgreSQL (builds the image, which includes Tesseract OCR)
-docker compose up -d --build postgres backend
-curl http://localhost:8080/api/analise/health
-
-# 3. Frontend in API mode
-cd frontend
-cp .env.example .env          # set VITE_DATA_SOURCE=api and VITE_API_TIMEOUT_MS=60000
-npm install
-npm run dev                   # http://localhost:5174
+cp .env.example .env              # then fill in GEMINI_API_KEY (the .env file is ignored by git)
+(cd frontend && cp .env.example .env && npm install)   # set VITE_DATA_SOURCE=api in frontend/.env
+scripts/rodar.sh                  # backend + PostgreSQL (Docker) + frontend, opens http://localhost:5174
+scripts/parar.sh                  # stops everything (data is kept)
 ```
+
+Inside Claude Code the same two actions are the `/run_kaup` and `/stop_kaup` skills.
 
 Always start the backend before the frontend. Without it the app shows "Não foi possível falar com o servidor".
 
