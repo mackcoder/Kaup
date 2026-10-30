@@ -28,6 +28,11 @@ services:
       - KAUP_ADMIN_ENABLED=${KAUP_ADMIN_ENABLED:-true}
       - KAUP_ADMIN_EMAIL=${KAUP_ADMIN_EMAIL:-ADMIN@ADMIN}
       - KAUP_ADMIN_PASSWORD=${KAUP_ADMIN_PASSWORD:-ADMIN}
+      # Recuperação de senha SIMULADA (sem e-mail): o "código enviado" é sempre este. Só para desenvolvimento;
+      # vazio desliga a recuperação.
+      - KAUP_CODIGO_FAKE=${KAUP_CODIGO_FAKE-676869}
+      # Dias até os documentos (e conversas) dos usuários serem apagados. 0 desliga.
+      - KAUP_RETENCAO_DIAS=${KAUP_RETENCAO_DIAS:-180}
     depends_on:
       - postgres
 

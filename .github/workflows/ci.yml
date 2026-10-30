@@ -171,6 +171,53 @@ jobs:
           echo
           grep -q "Gemini" resposta.json
 
+      - name: Exportar os dados da conta (sem a senha)
+        run: |
+          J=/tmp/jar-ci.txt
+          code=$(curl -s -b $J -o exportacao.json -D cab.txt -w "%{http_code}" http://localhost:8080/api/conta/exportar)
+          echo "GET /api/conta/exportar: HTTP $code"; test "$code" = "200"
+          grep -qi 'content-disposition: attachment' cab.txt
+          grep -q '"account"' exportacao.json
+          ! grep -qi 'senha\|password\|\$2a\$' exportacao.json
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/conta/exportar)
+          echo "sem login: HTTP $code"; test "$code" = "401"
+
+      - name: Muitas senhas erradas bloqueiam o login por alguns segundos (429)
+        run: |
+          J=/tmp/jar-limite.txt
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          entrar() {
+            curl -s -c $J -b $J -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/auth/entrar \
+              -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
+              -d '{"email":"limite@ci.test","password":"errada12345"}'
+          }
+          for i in 1 2 3 4 5; do test "$(entrar)" = "401"; done
+          code=$(entrar); echo "6a tentativa: HTTP $code"; test "$code" = "429"
+          sleep 11
+          code=$(entrar); echo "depois de 11 s: HTTP $code"; test "$code" = "401"
+
+      - name: Recuperação de senha simulada (código fixo) e o administrador nunca é alterado
+        run: |
+          J=/tmp/jar-rec.txt
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          post() {
+            curl -s -c $J -b $J -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080$1" \
+              -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" -d "$2"
+          }
+          test "$(post /api/auth/cadastro '{"name":"Rec","email":"rec@ci.test","password":"senha1234","confirmPassword":"senha1234"}')" = "201"
+          post /api/auth/sair '{}' >/dev/null
+          test "$(post /api/auth/recuperar/solicitar '{"email":"rec@ci.test"}')" = "204"
+          test "$(post /api/auth/recuperar/solicitar '{"email":"ninguem@ci.test"}')" = "204"
+          test "$(post /api/auth/recuperar/redefinir '{"email":"rec@ci.test","code":"000000","password":"novasenha1","confirmPassword":"novasenha1"}')" = "400"
+          # Administrador: mesmo com o código certo, a resposta é a de um código errado.
+          test "$(post /api/auth/recuperar/redefinir '{"email":"ADMIN@ADMIN","code":"676869","password":"novasenha1","confirmPassword":"novasenha1"}')" = "400"
+          test "$(post /api/auth/recuperar/redefinir '{"email":"rec@ci.test","code":"676869","password":"novasenha1","confirmPassword":"novasenha1"}')" = "204"
+          test "$(post /api/auth/entrar '{"email":"rec@ci.test","password":"senha1234"}')" = "401"
+          test "$(post /api/auth/entrar '{"email":"rec@ci.test","password":"novasenha1"}')" = "200"
+          test "$(post /api/auth/entrar '{"email":"ADMIN@ADMIN","password":"ADMIN"}')" = "200"
+
       - name: Excluir a conta apaga a pessoa e encerra a sessão
         run: |
           J=/tmp/jar-ci.txt
