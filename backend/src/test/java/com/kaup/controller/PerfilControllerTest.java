@@ -36,7 +36,7 @@ class PerfilControllerTest {
     private PerfilService perfilService;
 
     private PerfilResponse perfil() {
-        return new PerfilResponse("Ana Souza", "ana@exemplo.com", "large", "simple", "prefer_not", false, true);
+        return new PerfilResponse("Ana Souza", "ana@exemplo.com", "large", "simple", "prefer_not", false, true, 180);
     }
 
     @Test
@@ -51,6 +51,7 @@ class PerfilControllerTest {
                 .andExpect(jsonPath("$.income").value("prefer_not"))
                 .andExpect(jsonPath("$.audio").value(false))
                 .andExpect(jsonPath("$.shareIncomeWithAi").value(true))
+                .andExpect(jsonPath("$.retentionDays").value(180))
                 .andExpect(jsonPath("$", hasKey("email")));
     }
 

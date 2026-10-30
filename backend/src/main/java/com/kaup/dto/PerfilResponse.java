@@ -7,6 +7,7 @@ import com.kaup.entity.Usuario;
  * O frontend rejeita nulos e valores fora das listas de {@code PerfilOpcoes}.
  *
  * @param shareIncomeWithAi falso quando a pessoa bloqueou o envio da renda à IA
+ * @param retentionDays depois de quantos dias os documentos são apagados; 0 se nunca
  */
 public record PerfilResponse(
         String name,
@@ -15,10 +16,12 @@ public record PerfilResponse(
         String explainLevel,
         String income,
         boolean audio,
-        boolean shareIncomeWithAi) {
+        boolean shareIncomeWithAi,
+        int retentionDays) {
 
-    public static PerfilResponse de(Usuario usuario) {
+    public static PerfilResponse de(Usuario usuario, int retentionDays) {
         return new PerfilResponse(usuario.getNome(), usuario.getEmail(), usuario.getFontSize(),
-                usuario.getExplainLevel(), usuario.getIncome(), usuario.isAudio(), usuario.isCompartilharRenda());
+                usuario.getExplainLevel(), usuario.getIncome(), usuario.isAudio(), usuario.isCompartilharRenda(),
+                retentionDays);
     }
 }

@@ -34,7 +34,9 @@ class PerfilServiceTest {
     @BeforeEach
     void preparar() {
         repository = mock(UsuarioRepository.class);
-        service = new PerfilService(repository);
+        Retencao retencao = mock(Retencao.class);
+        when(retencao.dias()).thenReturn(180);
+        service = new PerfilService(repository, retencao);
         ana = new Usuario();
         ReflectionTestUtils.setField(ana, "id", id);
         ana.setNome("Ana Souza");
@@ -58,6 +60,7 @@ class PerfilServiceTest {
         assertEquals("prefer_not", perfil.income());
         assertFalse(perfil.audio());
         assertTrue(perfil.shareIncomeWithAi()); // ligado por padrão; a pessoa pode bloquear
+        assertEquals(180, perfil.retentionDays());
     }
 
     @Test

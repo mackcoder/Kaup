@@ -18,14 +18,16 @@ import com.kaup.repository.UsuarioRepository;
 public class PerfilService {
 
     private final UsuarioRepository repository;
+    private final Retencao retencao;
 
-    public PerfilService(UsuarioRepository repository) {
+    public PerfilService(UsuarioRepository repository, Retencao retencao) {
         this.repository = repository;
+        this.retencao = retencao;
     }
 
     @Transactional(readOnly = true)
     public PerfilResponse obter(UUID usuarioId) {
-        return PerfilResponse.de(carregar(usuarioId));
+        return PerfilResponse.de(carregar(usuarioId), retencao.dias());
     }
 
     /** Aplica só os campos preenchidos; qualquer valor inválido recusa o pedido inteiro. */
@@ -51,7 +53,7 @@ public class PerfilService {
         if (income != null) usuario.setIncome(income);
         if (pedido.audio() != null) usuario.setAudio(pedido.audio());
         if (pedido.shareIncomeWithAi() != null) usuario.setCompartilharRenda(pedido.shareIncomeWithAi());
-        return PerfilResponse.de(repository.save(usuario));
+        return PerfilResponse.de(repository.save(usuario), retencao.dias());
     }
 
     private Usuario carregar(UUID usuarioId) {

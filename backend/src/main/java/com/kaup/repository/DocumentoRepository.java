@@ -1,5 +1,6 @@
 package com.kaup.repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,4 +23,15 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
     @Modifying
     @Query("update Documento d set d.dono = :dono where d.dono is null")
     int atribuirSemDono(@Param("dono") Usuario dono);
+
+    /**
+     * Apaga os documentos de usuários comuns criados antes de {@code limite} (as conversas vão
+     * junto, pela cascata do banco). Ignora os sem dono e os do administrador. Devolve quantos foram.
+     */
+    @Modifying
+    @Query("""
+            delete from Documento d
+            where d.criadoEm < :limite
+              and d.dono.id in (select u.id from Usuario u where u.papel = com.kaup.entity.Papel.USER)""")
+    int apagarDeUsuariosAnterioresA(@Param("limite") Instant limite);
 }
