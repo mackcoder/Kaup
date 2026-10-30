@@ -73,25 +73,80 @@ jobs:
           docker compose logs backend --tail 100
           exit 1
 
-      - name: Conferir que a tabela documento foi criada
-        run: docker compose exec -T postgres psql -U usuario_app -d gestao_contratos -c "\dt" | grep documento
-
-      - name: Listagem de documentos deve responder com lista vazia
+      - name: Conferir que as tabelas foram criadas (documentos, contas, conversas e sessões)
         run: |
-          resposta=$(curl -fsS http://localhost:8080/api/documentos)
+          tabelas=$(docker compose exec -T postgres psql -U usuario_app -d gestao_contratos -c "\dt")
+          echo "$tabelas"
+          for t in documento usuario mensagem_chat spring_session; do
+            echo "$tabelas" | grep -q "$t" || { echo "faltou a tabela $t"; exit 1; }
+          done
+
+      - name: Sem login a API recusa (401), exceto o health
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/documentos)
+          echo "GET /api/documentos sem login: HTTP $code"
+          test "$code" = "401"
+
+      - name: Entrar como administrador (conta criada na subida)
+        run: |
+          J=/tmp/jar-admin.txt
+          # O primeiro GET responde 401 mas já entrega o cookie XSRF-TOKEN, que o login precisa devolver.
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          test -n "$TOKEN"
+          resposta=$(curl -fsS -c $J -b $J -X POST http://localhost:8080/api/auth/entrar \
+            -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
+            -d '{"email":"ADMIN@ADMIN","password":"ADMIN"}')
+          echo "$resposta"
+          echo "$resposta" | grep -q '"role":"ADMIN"'
+
+      - name: Cadastro valida a senha e já deixa a pessoa logada
+        run: |
+          J=/tmp/jar-ci.txt
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          cadastrar() {
+            curl -s -c $J -b $J -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/auth/cadastro \
+              -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" -d "$1"
+          }
+          code=$(cadastrar '{"name":"Ci","email":"ci@teste.com","password":"senha1234","confirmPassword":"outra1234"}')
+          echo "senhas diferentes: HTTP $code"; test "$code" = "400"
+          code=$(cadastrar '{"name":"Ci","email":"ci@teste.com","password":"senha1234","confirmPassword":"senha1234"}')
+          echo "cadastro valido: HTTP $code"; test "$code" = "201"
+          code=$(curl -s -c $J -b $J -o /dev/null -w "%{http_code}" http://localhost:8080/api/auth/eu)
+          echo "logado depois do cadastro: HTTP $code"; test "$code" = "200"
+
+      - name: Perfil padrão e atualização
+        run: |
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          curl -fsS -b $J http://localhost:8080/api/perfil | tee perfil.json; echo
+          grep -q '"fontSize":"large"' perfil.json
+          grep -q '"shareIncomeWithAi":true' perfil.json
+          curl -fsS -b $J -c $J -X PATCH http://localhost:8080/api/perfil \
+            -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
+            -d '{"explainLevel":"complete","shareIncomeWithAi":false}' | tee perfil.json; echo
+          grep -q '"explainLevel":"complete"' perfil.json
+          grep -q '"shareIncomeWithAi":false' perfil.json
+
+      - name: Listagem de documentos deve responder com lista vazia para a pessoa nova
+        run: |
+          resposta=$(curl -fsS -b /tmp/jar-ci.txt http://localhost:8080/api/documentos)
           echo "$resposta"
           test "$resposta" = "[]"
 
       - name: Documento inexistente deve retornar 404
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/documentos/nao-existe)
+          code=$(curl -s -b /tmp/jar-ci.txt -o /dev/null -w "%{http_code}" http://localhost:8080/api/documentos/nao-existe)
           echo "HTTP $code"
           test "$code" = "404"
 
       - name: Texto vazio deve retornar 400
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/analise/texto \
-            -H "Content-Type: application/json" -d '{"texto":""}')
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          code=$(curl -s -b $J -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/analise/texto \
+            -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" -d '{"texto":""}')
           echo "HTTP $code"
           test "$code" = "400"
 
@@ -107,11 +162,23 @@ jobs:
           d.text((40, 120), "O locatario pagara R$ 1.500,00 por mes, ate o dia 5.", font=font, fill="black")
           img.save("contrato.png")
           EOF
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
           # Sem chave do Gemini, a resposta esperada e 502 "IA (Gemini)":
           # isso prova que o OCR local passou e so a etapa da IA falhou.
-          curl -s -X POST http://localhost:8080/api/analise/contrato -F "arquivo=@contrato.png;type=image/png" | tee resposta.json
+          curl -s -b $J -X POST http://localhost:8080/api/analise/contrato -H "X-XSRF-TOKEN: $TOKEN" \
+            -F "arquivo=@contrato.png;type=image/png" | tee resposta.json
           echo
           grep -q "Gemini" resposta.json
+
+      - name: Excluir a conta apaga a pessoa e encerra a sessão
+        run: |
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          code=$(curl -s -b $J -c $J -o /dev/null -w "%{http_code}" -X DELETE http://localhost:8080/api/conta -H "X-XSRF-TOKEN: $TOKEN")
+          echo "DELETE /api/conta: HTTP $code"; test "$code" = "204"
+          code=$(curl -s -b $J -o /dev/null -w "%{http_code}" http://localhost:8080/api/auth/eu)
+          echo "depois de excluir: HTTP $code"; test "$code" = "401"
 
       - name: Logs do backend (se algo falhou)
         if: failure()
