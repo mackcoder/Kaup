@@ -62,6 +62,33 @@ Through this project, we expect to **put our *Software Engineering* knowledge in
 
 ---
 
+## 🛠️ Running locally (development)
+
+Requirements: Docker with Compose, and Node 22+. You also need a Gemini API key.
+
+```bash
+# 1. Configure the secrets (the .env file is ignored by git)
+cp .env.example .env          # then fill in GEMINI_API_KEY
+
+# 2. Backend + PostgreSQL (builds the image, which includes Tesseract OCR)
+docker compose up -d --build postgres backend
+curl http://localhost:8080/api/analise/health
+
+# 3. Frontend in API mode
+cd frontend
+cp .env.example .env          # set VITE_DATA_SOURCE=api and VITE_API_TIMEOUT_MS=60000
+npm install
+npm run dev                   # http://localhost:5174
+```
+
+Always start the backend before the frontend. Without it the app shows "Não foi possível falar com o servidor".
+
+**Accounts.** Create an account on the "Criar conta" screen (name, e-mail, password of 8+ characters and its confirmation). Each person only sees their own documents. A development administrator account is created on startup (`ADMIN@ADMIN` / `ADMIN`): it can **read** every document but cannot change other people's documents, and its account cannot be deleted. **Set `KAUP_ADMIN_PASSWORD` (or `KAUP_ADMIN_ENABLED=false`) before publishing the system.** The first regular user to sign up adopts any documents that existed before accounts were introduced.
+
+**Tests.** Backend: `cd backend && mvn verify` (or run Maven inside Docker). Frontend: `cd frontend && npm test`.
+
+---
+
 ## ✉️ Contact
 
 Feel free to reach out to the team members with questions, suggestions, or collaborations:
