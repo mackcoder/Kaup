@@ -1,4 +1,6 @@
 import type {
+  AuthUser,
+  RegisterInput,
   ChatMessage,
   ChatSendOptions,
   ChatTurnResult,
@@ -9,6 +11,19 @@ import type {
 } from "../../types/domain";
 export interface KaupService {
   readonly mode: "mock" | "api";
+  /** Chamado quando o servidor diz que a sessão acabou (401 fora do login). */
+  onUnauthorized: (() => void) | null;
+  /** Quem está logado, ou null se ninguém. */
+  getSession(signal?: AbortSignal): Promise<AuthUser | null>;
+  register(input: RegisterInput, signal?: AbortSignal): Promise<AuthUser>;
+  login(
+    email: string,
+    password: string,
+    signal?: AbortSignal,
+  ): Promise<AuthUser>;
+  logout(signal?: AbortSignal): Promise<void>;
+  /** Apaga a conta, os documentos e as conversas. */
+  deleteAccount(signal?: AbortSignal): Promise<void>;
   listDocuments(signal?: AbortSignal): Promise<KaupDocument[]>;
   getDocument(id: string, signal?: AbortSignal): Promise<KaupDocument>;
   upload(

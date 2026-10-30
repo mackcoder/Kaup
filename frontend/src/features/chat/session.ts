@@ -56,6 +56,10 @@ const sessions = new WeakMap<
   KaupService,
   Map<string, ReturnType<typeof createSession>>
 >();
+/** Ao sair da conta, as conversas em memória não podem ficar para a próxima pessoa. */
+export function clearChatSessions(service: KaupService) {
+  sessions.delete(service);
+}
 export function chatSession(service: KaupService, documentId: string) {
   let documents = sessions.get(service);
   if (!documents) {

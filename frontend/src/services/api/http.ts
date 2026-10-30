@@ -48,7 +48,16 @@ function errorMessage(
   if (empty && status >= 500) return backendForaDoAr(status);
   return `A API retornou erro ${status}. Tente novamente.`;
 }
-export function createHttp(baseUrl: string, timeoutMs = 20000) {
+/** O backend entrega o token CSRF num cookie legível; ele volta num cabeçalho nas escritas. */
+function csrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+export function createHttp(
+  baseUrl: string,
+  timeoutMs = 20000,
+  onUnauthorized: () => void = () => {},
+) {
   return async function request(
     path: string,
     init: RequestInit = {},
@@ -66,10 +75,26 @@ export function createHttp(baseUrl: string, timeoutMs = 20000) {
       timeoutMs,
     );
     try {
+      const writes = !["GET", "HEAD", "OPTIONS"].includes(
+        (init.method ?? "GET").toUpperCase(),
+      );
+      const token = writes ? csrfToken() : null;
       const response = await fetch(baseUrl.replace(/\/$/, "") + path, {
         ...init,
+        // Só mexe nos cabeçalhos quando há token (um upload não deve ganhar Content-Type à força).
+        ...(token && {
+          headers: {
+            ...Object.fromEntries(new Headers(init.headers)),
+            "X-XSRF-TOKEN": token,
+          },
+        }),
+        // Com a API em outra origem os cookies só vão se pedido; na mesma origem (proxy) vão sozinhos.
+        credentials: baseUrl ? "include" : "same-origin",
         signal: controller.signal,
       });
+      // Sessão acabou: avisa a aplicação (menos nas telas de login, onde 401 é senha errada).
+      if (response.status === 401 && !path.startsWith("/api/auth/"))
+        onUnauthorized();
       if (!response.ok)
         throw new ApiError(
           errorMessage(path, response.status, await errorInfo(response)),

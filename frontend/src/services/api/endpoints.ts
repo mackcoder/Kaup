@@ -1,6 +1,11 @@
-/** Only health exists today. All other paths are PROPOSED contracts. */
+/** Caminhos do backend (ver backend/src/main/java/com/kaup/controller). */
 export const endpoints = {
   health: "/api/analise/health",
+  session: "/api/auth/eu",
+  login: "/api/auth/entrar",
+  register: "/api/auth/cadastro",
+  logout: "/api/auth/sair",
+  account: "/api/conta",
   documents: "/api/documentos",
   profile: "/api/perfil",
   document: (id: string) => `/api/documentos/${encodeURIComponent(id)}`,

@@ -1,4 +1,5 @@
 import type {
+  AuthUser,
   DocumentAnalysis,
   KaupDocument,
   ProcessingStatus,
@@ -69,6 +70,8 @@ export function documentFromDTO(value: unknown): KaupDocument {
     description:
       typeof d.description === "string" ? d.description : "Documento enviado",
     emoji: "📄",
+    // Ausente (versões antigas do backend): trata como do próprio usuário.
+    ownedByMe: typeof d.ownedByMe === "boolean" ? d.ownedByMe : true,
     status:
       d.visualStatus === "ok" ||
       d.visualStatus === "warning" ||
@@ -126,7 +129,8 @@ export function profileFromDTO(value: unknown): UserProfile {
     !["less3", "3to5", "5to7", "7to15", "more15", "prefer_not"].includes(
       String(p.income),
     ) ||
-    typeof p.audio !== "boolean"
+    typeof p.audio !== "boolean" ||
+    typeof p.shareIncomeWithAi !== "boolean"
   )
     throw new ApiError("Preferências incompatíveis com o contrato de perfil.");
   return {
@@ -136,5 +140,17 @@ export function profileFromDTO(value: unknown): UserProfile {
     explainLevel: p.explainLevel as UserProfile["explainLevel"],
     income: p.income as UserProfile["income"],
     audio: p.audio,
+    shareIncomeWithAi: p.shareIncomeWithAi,
+  };
+}
+export function authUserFromDTO(value: unknown): AuthUser {
+  const u = record(value);
+  if (u.role !== "USER" && u.role !== "ADMIN")
+    throw new ApiError("Papel de usuário inválido.");
+  return {
+    id: string(u.id),
+    name: string(u.name),
+    email: string(u.email),
+    role: u.role,
   };
 }

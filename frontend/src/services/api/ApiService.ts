@@ -1,5 +1,9 @@
 import type { KaupService } from "../contracts/KaupService";
-import type { UserProfile, ContextFile } from "../../types/domain";
+import type {
+  UserProfile,
+  ContextFile,
+  RegisterInput,
+} from "../../types/domain";
 import { createHttp, ApiError } from "./http";
 import { endpoints as e } from "./endpoints";
 import {
@@ -8,13 +12,52 @@ import {
   analysisFromDTO,
   messageFromDTO,
   profileFromDTO,
+  authUserFromDTO,
   string,
 } from "./dto";
 export class ApiService implements KaupService {
   readonly mode = "api" as const;
+  onUnauthorized: (() => void) | null = null;
   private request: ReturnType<typeof createHttp>;
   constructor(baseUrl = "", timeoutMs = 20000) {
-    this.request = createHttp(baseUrl, timeoutMs);
+    this.request = createHttp(baseUrl, timeoutMs, () =>
+      this.onUnauthorized?.(),
+    );
+  }
+  async getSession(signal?: AbortSignal) {
+    try {
+      return authUserFromDTO(await this.request(e.session, { signal }));
+    } catch (error) {
+      // 401 aqui não é erro: só significa que ninguém está logado.
+      if (error instanceof ApiError && error.status === 401) return null;
+      throw error;
+    }
+  }
+  async register(input: RegisterInput, signal?: AbortSignal) {
+    return authUserFromDTO(
+      await this.request(e.register, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+        signal,
+      }),
+    );
+  }
+  async login(email: string, password: string, signal?: AbortSignal) {
+    return authUserFromDTO(
+      await this.request(e.login, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+        signal,
+      }),
+    );
+  }
+  async logout(signal?: AbortSignal) {
+    await this.request(e.logout, { method: "POST", signal });
+  }
+  async deleteAccount(signal?: AbortSignal) {
+    await this.request(e.account, { method: "DELETE", signal });
   }
   async listDocuments(signal?: AbortSignal) {
     return array(await this.request(e.documents, { signal })).map(

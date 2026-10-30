@@ -1,6 +1,7 @@
 import { useEffect, type ReactNode } from "react";
 import {
   Link,
+  Navigate,
   Route,
   Routes,
   useLocation,
@@ -14,6 +15,8 @@ import CategoryPage from "../pages/CategoryPage";
 import DocumentsPage from "../pages/DocumentsPage";
 import ChatPage from "../pages/ChatPage";
 import ProfilePage from "../pages/ProfilePage";
+import LoginPage from "../pages/LoginPage";
+import RegisterPage from "../pages/RegisterPage";
 import ResourceState from "../components/ResourceState";
 import type { DocumentView, FilterKey } from "../types/domain";
 function useActions() {
@@ -113,19 +116,49 @@ function NotFound() {
   );
 }
 export default function App() {
-  const { service, error, loading, reload } = useApp();
+  const { service, error, loading, reload, user, authLoading, authError } =
+    useApp();
   const location = useLocation();
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+  const modeLabel = (
+    <div className="mode-label">
+      {service.mode === "mock"
+        ? "Demonstração · dados fictícios"
+        : "Modo API · integração Spring Boot"}
+    </div>
+  );
+  // Ainda descobrindo se há sessão, ou sem conseguir falar com o servidor: não é "deslogado".
+  if (authLoading || authError)
+    return (
+      <>
+        {modeLabel}
+        <ResourceState
+          loading={authLoading}
+          error={authError}
+          onRetry={reload}
+        />
+      </>
+    );
+  // Sem login só existem as telas de conta. O endereço pedido é mantido: depois de entrar,
+  // a pessoa continua onde queria (ex.: um link direto para um documento).
+  if (!user)
+    return (
+      <>
+        {modeLabel}
+        <Routes>
+          <Route path="/cadastro" element={<RegisterPage />} />
+          <Route path="*" element={<LoginPage />} />
+        </Routes>
+      </>
+    );
   return (
     <>
-      <div className="mode-label">
-        {service.mode === "mock"
-          ? "Demonstração · dados fictícios"
-          : "Modo API · integração Spring Boot"}
-      </div>
+      {modeLabel}
       <Routes>
+        <Route path="/entrar" element={<Navigate to="/" replace />} />
+        <Route path="/cadastro" element={<Navigate to="/" replace />} />
         <Route
           path="/"
           element={

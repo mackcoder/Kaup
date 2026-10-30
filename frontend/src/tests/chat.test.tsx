@@ -399,6 +399,13 @@ describe("chat API sem roteiro fictício", () => {
       explainLevel: "simple",
       income: "prefer_not",
       audio: false,
+      shareIncomeWithAi: true,
+    });
+    vi.spyOn(service, "getSession").mockResolvedValue({
+      id: "u1",
+      name: "HTTP",
+      email: "http@example.test",
+      role: "USER",
     });
     return service;
   }

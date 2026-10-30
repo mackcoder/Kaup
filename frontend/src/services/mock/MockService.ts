@@ -19,6 +19,7 @@ import type {
   DocumentAnalysis,
   KaupDocument,
   UserProfile,
+  AuthUser,
 } from "../../types/domain";
 const months = [
   "jan",
@@ -61,7 +62,27 @@ export class MockService implements KaupService {
     explainLevel: "simple",
     income: "prefer_not",
     audio: false,
+    shareIncomeWithAi: true,
   };
+  // A demonstração não tem contas: há sempre alguém "logado" e sair é só uma simulação na tela.
+  onUnauthorized: (() => void) | null = null;
+  private demoUser: AuthUser = {
+    id: "demo",
+    name: "João da Silva",
+    email: "joao@email.com",
+    role: "USER",
+  };
+  async getSession() {
+    return structuredClone(this.demoUser);
+  }
+  async register() {
+    return structuredClone(this.demoUser);
+  }
+  async login() {
+    return structuredClone(this.demoUser);
+  }
+  async logout() {}
+  async deleteAccount() {}
   async listDocuments() {
     return structuredClone(this.docs);
   }
