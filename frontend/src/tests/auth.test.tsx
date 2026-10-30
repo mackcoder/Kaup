@@ -97,7 +97,9 @@ describe("entrar (modo API)", () => {
     montar(servico(null));
     await screen.findByRole("heading", { name: "Entrar" });
     expect(campo("Sua senha")).toHaveAttribute("type", "password");
-    await u.click(screen.getByRole("button", { name: "Mostrar sua senha" }));
+    await u.click(
+      screen.getByRole("button", { name: "Mostrar a senha digitada" }),
+    );
     expect(campo("Sua senha")).toHaveAttribute("type", "text");
   });
   it("depois de entrar a pessoa continua no endereço que pediu", async () => {

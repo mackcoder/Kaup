@@ -45,7 +45,8 @@ export function PasswordField(props: FieldProps) {
           type="button"
           className="auth-toggle"
           aria-pressed={shown}
-          aria-label={`${shown ? "Ocultar" : "Mostrar"} ${props.label.toLowerCase()}`}
+          aria-controls={props.id}
+          aria-label={`${shown ? "Ocultar" : "Mostrar"} a senha digitada`}
           onClick={() => setShown((s) => !s)}
         >
           {shown ? "Ocultar" : "Mostrar"}
