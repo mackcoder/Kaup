@@ -42,13 +42,21 @@ public record PreferenciasDeIA(String nivelDeExplicacao, String faixaDeRenda) {
         };
     }
 
-    /** Trecho de instrução sobre a renda, ou nulo se ela não deve ser usada. */
+    /**
+     * Trecho de instrução sobre a renda. Vale nos dois casos: com a renda disponível a IA a usa e
+     * a diz quando perguntada; sem ela, a IA sabe que não a tem (em vez de procurá-la no contrato).
+     */
     public String instrucaoDeRenda() {
         if (faixaDeRenda == null) {
-            return null;
+            return "Você não tem a renda da pessoa (ela não informou ou preferiu não compartilhar). "
+                    + "Se ela perguntar, diga com gentileza que você não tem essa informação e que ela "
+                    + "pode contar na conversa se quiser.";
         }
-        return "A pessoa informou que a renda mensal dela é " + faixaDeRenda + ". Use isso só para dizer, quando "
-                + "ela perguntar, se valores e parcelas do contrato pesam no orçamento. Não peça mais dados "
-                + "pessoais e não repita a renda sem necessidade.";
+        return "A pessoa informou que a renda mensal dela está na faixa de " + faixaDeRenda + ". Você pode "
+                + "usar isso: se ela perguntar qual é a renda dela, diga a faixa; e use-a para dizer se valores "
+                + "e parcelas do contrato pesam no orçamento, quando a pergunta for sobre isso. Só mencione a "
+                + "renda nessas situações: não a traga em respostas que não tenham relação com renda ou "
+                + "orçamento, nem diga que ela \"tem folga\" sem ter sido perguntado. Não peça mais dados "
+                + "pessoais.";
     }
 }

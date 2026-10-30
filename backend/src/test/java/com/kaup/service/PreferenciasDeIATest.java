@@ -1,6 +1,7 @@
 package com.kaup.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,7 +35,10 @@ class PreferenciasDeIATest {
         PreferenciasDeIA prefs = PreferenciasDeIA.de(usuario("simple", "more15", false));
 
         assertNull(prefs.faixaDeRenda());
-        assertNull(prefs.instrucaoDeRenda());
+        // A IA fica sabendo que não tem a renda, mas nunca recebe o valor.
+        assertTrue(prefs.instrucaoDeRenda().contains("não tem a renda"));
+        assertFalse(prefs.instrucaoDeRenda().contains("R$"));
+        assertFalse(prefs.instrucaoDeRenda().contains("more15"));
     }
 
     @Test
@@ -42,6 +46,17 @@ class PreferenciasDeIATest {
         PreferenciasDeIA prefs = PreferenciasDeIA.de(usuario("simple", "prefer_not", true));
 
         assertNull(prefs.faixaDeRenda());
+        assertTrue(prefs.instrucaoDeRenda().contains("não tem a renda"));
+    }
+
+    @Test
+    void comARendaDisponivelAIaPodeDizerlaQuandoPerguntada() {
+        PreferenciasDeIA prefs = PreferenciasDeIA.de(usuario("simple", "7to15", true));
+
+        assertTrue(prefs.instrucaoDeRenda().contains("entre R$ 7.000 e R$ 15.000"));
+        assertTrue(prefs.instrucaoDeRenda().contains("diga a faixa"));
+        // Não deve virar assunto em respostas que não têm relação com renda.
+        assertTrue(prefs.instrucaoDeRenda().contains("não a traga em respostas"));
     }
 
     @Test
