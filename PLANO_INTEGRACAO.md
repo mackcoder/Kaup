@@ -203,7 +203,7 @@ O `API_CONTRACT_RASCUNHO.md` diz que o backend precisa aprovar o contrato. **Rec
 |---|---|---|---|
 | **0 — Alinhamento (½ dia)** | Fechar o contrato e desbloquear o ambiente | Aprovar os DTOs do rascunho; decidir sync/async do MVP; subir stack local (Postgres + backend com chave Gemini válida); confirmar modelo Gemini | 19 |
 | **1 — Fatia vertical: upload → resumo** | Primeiro fluxo real ponta a ponta | `Documento` + persistência; `POST /api/documentos`; `GET …/{id}` e `GET …/{id}/analise` com mapeamento; `http.ts` lendo `ProblemDetail`; timeout ajustado; testar com `VITE_DATA_SOURCE=api` | 3, 4, 5, 7, 18 |
-| **2 — Documentos persistidos** | Tela inicial e listas com dados reais | `GET /api/documentos`; `visualStatus`/`description`; categorização via Gemini | 6, 8 |
+| **2 — Documentos persistidos** | Tela inicial e listas com dados reais | ~~`GET /api/documentos`; `visualStatus`/`description`~~ (feitos na Fase 1); categorização via Gemini | 8 |
 | **3 — Chat** | Perguntas sobre o contrato | Método de conversa no `GeminiService`; entidade `MensagemChat`; `POST/GET …/chat/mensagens`; validar o comportamento de `ChatPage` em modo API | 9, 10 |
 | **4 — Perfil e personalização** | Preferências valem de verdade | `GET/PATCH /api/perfil`; injeção de `explainLevel`/`income` no prompt. *Sem auth, é um perfil global — só para demo.* | 11, 12 |
 | **5 — Conta e privacidade** | Pré-requisito para dados reais de pessoas | Spring Security, `Usuario`, `usuarioId` em tudo, 401/403, UI de login, `DELETE` de documento (+ botão), exclusão de conta, política LGPD. **Não publicar com dados reais antes desta fase.** | 13, 14, 17 |
@@ -257,24 +257,45 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 - **O erro de OCR ficou restrito ao caminho do PDF escaneado:** o mesmo conteúdo como PNG ou JPEG leu "R$ 1.500,00". A amostra de PDF escaneado foi gerada rasterizando um PDF digital a 200 DPI e o backend a re-renderiza a 300 DPI, então pode ser artefato do teste; **não confirmado** com um PDF escaneado de verdade. Mesmo assim, o risco de erro silencioso em valores justifica um aviso de baixa confiança (`ocrQualityWarning`, §4.1 ponto 4).
 - **Ressalva:** uma chamada por modelo no teste direto e poucas no backend; os modelos "lite" podem ser mais fracos em contratos longos ou cláusulas complicadas (qualidade do resumo **não avaliada**).
 
-### Fase 1 — Upload → resumo
-- [ ] Backend: entidade `Documento` (+ relação com `Analise`) e repositório
-- [ ] Backend: `POST /api/documentos` (campo `file`, `categoryId` opcional) reaproveitando `validar`, `OcrService`, `GeminiService`
-- [ ] Backend: DTOs com `id` String, `categoryId` explícito (null), `createdAt` ISO com fuso, `processingStatus` minúsculo
-- [ ] Backend: `GET /api/documentos/{id}` e `GET /api/documentos/{id}/analise` com mapeamento `resumo/pontosDeAtencao/valores/prazos/multasEJuros/obrigacoes → summary/keyPoints`
-- [ ] Backend: falha de OCR/IA → `processingStatus=failed` + `ocrQualityWarning`
-- [ ] Backend: handler 404 e handler genérico 500
-- [ ] Frontend: `http.ts` usar `ProblemDetail.detail`/`message`; ajustar mensagem de 404
-- [ ] Frontend: configurar `VITE_DATA_SOURCE=api` e `VITE_API_TIMEOUT_MS` adequado
-- [ ] (Opcional) Frontend: mapear `valores/prazos` para `facts` e usar `severity` no `SummaryCard`
-- [ ] Teste manual: PDF digital, PDF escaneado, foto JPEG, arquivo `.txt` (deve falhar com mensagem do backend), arquivo >10 MiB (413)
-- [ ] Teste backend: controller com serviços mockados para o novo fluxo
+### Fase 1 — Upload → resumo (executada em 2026-10-30)
+- [x] Backend: entidade `Documento` (UUID, só texto extraído e análise; o arquivo original **não** é guardado) e `DocumentoRepository`; `Analise`/`AnaliseRepository` (não usadas) removidos
+- [x] Backend: `POST /api/documentos` (campo `file`, `categoryId` opcional validado contra `Carros/Casa/Trabalho/Banco/Outros`) reaproveitando OCR e IA por meio de `AnaliseService`
+- [x] Backend: DTOs com `id` String, `categoryId` explícito (null), `createdAt` ISO em UTC (milissegundos), `processingStatus` minúsculo
+- [x] Backend: `GET /api/documentos/{id}` e `GET /api/documentos/{id}/analise` com mapeamento `resumo/pontosDeAtencao/valores/prazos/multasEJuros/obrigacoes → summary/keyPoints` (`AnaliseMapper`)
+- [x] Backend: interface `ServicoDeIA` (provedor escolhido por `ia.provedor`) e timeout de leitura de 45 s no cliente do Gemini
+- [x] Backend: handler 404 (id inexistente ou que não é UUID). **Decisão:** falha de OCR/IA devolve erro e não salva (como combinado), então `failed`/`ocrQualityWarning` seguem sem uso; o handler genérico 500 **não foi criado** (o padrão do Spring Boot já devolve 500 sem expor a pilha, e um handler genérico poderia engolir erros 405/415 do próprio Spring)
+- [x] Backend: `GET /api/documentos` (lista, mais recente primeiro) e `GET .../chat/mensagens` devolvendo `[]` — **adiantados da Fase 2/3**, porque a Home e a tela de chat do frontend os chamam e quebram sem eles
+- [x] Frontend: `http.ts` usa `detail`/`message` do backend; texto do diálogo de envio corrigido; 3 testes novos (47 no total)
+- [x] Frontend: `frontend/.env` com `VITE_DATA_SOURCE=api` e `VITE_API_TIMEOUT_MS=60000` (arquivo ignorado pelo git; cada pessoa cria o seu)
+- [x] CI: o smoke test agora procura a tabela `documento`, confere a listagem vazia e o 404
+- [x] Teste backend: `DocumentoControllerTest`, `DocumentoServiceTest`, `AnaliseMapperTest` (25 testes no backend, todos passando)
+- [ ] (Opcional) Frontend: usar `severity` no `SummaryCard` (hoje ignorado) e dar títulos mais úteis às "Obrigação" (vários itens com o mesmo título)
+
+**Resultados medidos** (backend no Docker, modelo `gemini-3.5-flash-lite`):
+
+| Verificação | Resultado |
+|---|---|
+| `mvn verify` | 25 testes, `BUILD SUCCESS` (antes eram 3) |
+| Upload JPEG com `categoryId=Casa` | 201 em 4,0 s |
+| Upload PDF digital sem categoria | 201 em 2,1 s; `categoryId: null` presente, `id` é string UUID |
+| `GET` por id, análise, lista, chat | 200; lista ordenada do mais novo para o mais antigo; chat `[]` |
+| Reinício do container do backend | os 2 documentos continuam na lista e no Postgres (persistência real) |
+| `.txt` / categoria inválida / corpo sem `file` | 400 (mensagem em português) |
+| Arquivo de 11 MB | 413 |
+| id inexistente / id que não é UUID | 404 com `Documento não encontrado.` |
+| **Navegador real** (Chrome headless, modo API): enviar PNG pelo botão "Enviar documento" | redirecionou ao chat em 5,1 s, card de resumo com valores, prazos, multa e obrigações; recarregar (F5) mantém a análise; lista de documentos mostra os 3 enviados; **0 erros de JavaScript** |
+
+- **`GET /api/perfil` (ainda 404) não bloqueia a Home**: a tela carrega normalmente e só registra o 404. O stub de perfil previsto como contingência **não foi necessário**.
+- **Não retestado nesta fase:** PDF escaneado (o caminho de OCR é o mesmo da Fase 0, que leu "R$ 1.506,00" em vez de "R$ 1.500,00" nesse tipo de arquivo), PDFs longos, e o upload pelo celular/câmera.
+- **Qualidade da IA:** na análise de teste, a IA acrescentou uma comparação que não está no contrato ("relativamente alto comparado ao padrão de mercado de 2%") apesar do prompt pedir para não inventar. Merece uma revisão do prompt antes de usar com pessoas reais.
+- **Dados de teste:** os 3 documentos enviados nos testes (`foto.jpg`, `digital.pdf`, `imagem.png`) ficaram no Postgres local. Ainda não há endpoint de exclusão (Fase 5).
+- **Estado do repositório:** a pasta `frontend/src/node_modules` (cópia solta de dependências, 138 MB, ignorada pelo git) duplicava o React e quebrava 17 testes localmente; foi movida para fora do projeto. `frontend/src/dist` (build antigo) faz o `npm run lint` acusar 981 erros localmente; o CI não é afetado porque parte de um checkout limpo.
 
 ### Fase 2 — Documentos persistidos
-- [ ] `GET /api/documentos` ordenado por data
-- [ ] Devolver `visualStatus` e `description`
-- [ ] Pedir `categoria` ao Gemini e persistir em `categoryId`
-- [ ] Conferir Home, Categoria e Todos os Documentos com dados reais
+- [x] `GET /api/documentos` ordenado por data (feito na Fase 1)
+- [x] Devolver `visualStatus` e `description` (feito na Fase 1: `warning` se há pontos de atenção; descrição = 1ª frase do resumo)
+- [ ] Pedir `categoria` ao Gemini e persistir em `categoryId` (hoje só vale a categoria que o frontend envia; sem ela o documento aparece em "Outros")
+- [ ] Conferir Home, Categoria e Todos os Documentos com dados reais (Home verificada na Fase 1; faltam Categoria e Todos os Documentos)
 
 ### Fase 3 — Chat
 - [ ] `GeminiService`: método de conversa (texto livre) com texto do contrato + histórico + pergunta
