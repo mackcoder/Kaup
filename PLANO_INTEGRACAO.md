@@ -124,8 +124,8 @@ O `API_CONTRACT_RASCUNHO.md` diz que o backend precisa aprovar o contrato. **Rec
 - `processingStatus` ∈ `pending|processing|completed|failed` (minúsculas).
 
 **Síncrono × assíncrono.** O frontend aceita os dois: a `useChat` faz polling enquanto o status for `pending/processing`. Porém `ApiService.upload` aguarda a resposta do POST com **timeout padrão de 20 s** (`VITE_API_TIMEOUT_MS`). OCR de até 20 páginas a 300 DPI + chamada ao Gemini pode passar disso.
-- *MVP:* síncrono, devolvendo `completed`, e subir `VITE_API_TIMEOUT_MS` (ex.: 90000). Menos código.
-- *Depois:* `202 Accepted` + `@Async`/fila + polling (frontend já pronto). Atende melhor RD02/RD03.
+- *Decisão original:* síncrono, devolvendo `completed`, e subir `VITE_API_TIMEOUT_MS`. **Reaberta pela Fase 0:** os tempos medidos foram de 70 a 113 s (ver §7, Fase 0), então o timeout teria de passar de ~120 s.
+- *Recomendado agora:* `202 Accepted` + `@Async`/fila + polling (frontend já pronto: `useChat` consulta a análise a cada 2,5 s). Atende RD02/RD03. É mais código no backend (executor, status `processing`, tratamento de falha), mas sem isso o upload é inutilizável.
 
 **Frontend (ajustes)**
 - `http.ts`: ler o corpo de erro (`ProblemDetail.detail`) e usá-lo como mensagem (ver 4.8).
@@ -214,13 +214,32 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 
 ## 7. Checklist de tarefas
 
-### Fase 0 — Alinhamento
-- [ ] Aprovar o contrato de `frontend/API_CONTRACT_RASCUNHO.md` (caminhos, DTOs, nomes de campo)
-- [ ] Decidir: upload síncrono (MVP) ou 202 + polling
-- [ ] Definir se o `categoryId` usará as chaves do frontend (`Carros/Casa/Trabalho/Banco/Outros`) — alinhar com RF02
-- [ ] Subir Postgres + backend com `GEMINI_API_KEY` válida; chamar `POST /api/analise/contrato` com um contrato real
-- [ ] Confirmar que `gemini-3.8-flash` (ou outro modelo) responde
-- [ ] Resolver execução local do backend (host `postgres` fixo) e o `Dockerfile` ausente do frontend
+### Fase 0 — Alinhamento (executada em 2026-10-29)
+- [x] Aprovar o contrato de `frontend/API_CONTRACT_RASCUNHO.md` (caminhos, DTOs, nomes de campo) — aprovado
+- [~] Decidir: upload síncrono (MVP) ou 202 + polling — **decidido síncrono, mas a medição abaixo reabre a decisão**
+- [x] Categorias: usar as que já estão implementadas no frontend (`Carros/Casa/Trabalho/Banco/Outros`)
+- [x] Subir Postgres + backend com `GEMINI_API_KEY` válida e chamar `POST /api/analise/contrato` — funcionou (ver resultados)
+- [x] Confirmar que `gemini-3.8-flash` responde — **responde** (200 em `/contrato` e `/texto`)
+- [ ] Adiado de propósito: host `postgres` fixo e `Dockerfile` ausente do frontend (o front roda no host com `npm run dev`)
+
+**Resultados medidos** (amostras fictícias, backend deste repo no Docker, porta 8080):
+
+| Caso | Resultado | Tempo |
+|---|---|---|
+| `GET /api/analise/health` | 200; tabela `analise` criada pelo `ddl-auto` | — |
+| JPEG (foto) | 200 | 70,6 s |
+| PDF digital | 200 | 85,9 s |
+| PDF escaneado (sem texto embutido, usa Tesseract) | 200 | 113,2 s |
+| PNG | **sem resposta em 120 s** (limite do `curl`) | > 120 s |
+| `POST /api/analise/texto` (Gemini sem OCR) | 200 e depois 502 | 65,3 s e 10,9 s |
+| `.txt` / arquivo vazio / arquivo de 11 MB | 400 / 400 / 413, com `ProblemDetail.detail` em português | < 0,05 s |
+
+- **Formato do JSON da IA confirmado** nas 3 amostras que responderam: `resumo`, `valores`, `prazos`, `multasEJuros`, `obrigacoes`, `pontosDeAtencao`. O mapeamento da §4.1 vale como está.
+- **O tempo é quase todo do Gemini, não do OCR:** só o Gemini levou 65 s; com OCR, 70–113 s. Não há timeout configurado no `RestClient` do `GeminiService` (uma chamada pode ficar pendurada).
+- **Gemini devolve 503 "high demand" de forma intermitente** (log do backend); o `ApiExceptionHandler` converte para 502 com a mensagem da exceção.
+- **O OCR errou um valor financeiro:** no PDF escaneado, "R$ 1.500,00" foi lido como "R$ 1.506,00" e a IA repetiu o valor errado no resumo. Foi uma página sintética a 200 DPI; fotos reais tendem a piorar. Isso importa para um produto cujo objetivo é mostrar valores corretos (hoje o backend não tem nenhum aviso de baixa confiança do OCR; ver `ocrQualityWarning` na §4.1, ponto 4).
+
+**Consequência para a Fase 1:** com 70–113 s por upload, o upload síncrono com timeout de 20 s **não funciona**, e subir o timeout do navegador para ~150 s seria uma péssima experiência (RD02/RD03 pedem feedback em 1 s). Opções a decidir: (a) `202 Accepted` + processamento assíncrono + polling, que o frontend já suporta (recomendado); (b) reduzir a latência do Gemini (outro modelo ou menos "thinking") — **não testado**; (c) manter síncrono com timeout alto, só para demonstração.
 
 ### Fase 1 — Upload → resumo
 - [ ] Backend: entidade `Documento` (+ relação com `Analise`) e repositório
@@ -274,8 +293,8 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 
 ## 8. Não verificado (fora do escopo da leitura ou sem evidência)
 
-- **Nada foi executado**: não sei se o backend compila/sobe, se o OCR e o Gemini funcionam de verdade, nem se os testes passam. "Pronta" refere-se ao código lido, não a comportamento comprovado. O commit "Rodando Kaup - backend 80% operacional" sugere que o fluxo roda, mas não foi confirmado aqui.
-- Modelo `gemini-3.8-flash` válido ou não.
+- **Verificado na Fase 0 (2026-10-29):** o backend sobe no Docker, cria a tabela `analise`, e `/api/analise/contrato` funciona com JPEG, PDF digital e PDF escaneado; o modelo `gemini-3.8-flash` responde; erros 400/413 saem com mensagem em português. Detalhes e tempos em §7. **Continua não verificado:** os testes unitários (`mvn verify`), o PNG (estourou 120 s, sem resposta) e qualquer fluxo do frontend contra o backend.
+- Latência: 65–113 s por análise nas medições, mas é uma amostra pequena e o Gemini oscila (houve 503 intermitente); não sei se é típico.
 - `features/chat/session.ts`, `pages/ChatPage.tsx`, `components/UploadDialog.tsx` (lidos só por `grep`): comportamento exato em modo API, incluindo `stageFromHistory` e o ramo `service.mode`.
 - Conteúdo de `backend/config/init.sql` (a leitura não mostrou conteúdo relevante; não confirmado), `Tess4jConfig.java`, workflow de CI (`ACTIONS`) e `Dockerfile` do backend.
 - `docs/Arquitetura_Software/Projeto_Arquitetural.md` (só `grep`), `UseCasesExplicacao.md`, `WireFrame.md`, jornadas e personas — não lidos; a lista de requisitos veio de `Requirements.md`.
