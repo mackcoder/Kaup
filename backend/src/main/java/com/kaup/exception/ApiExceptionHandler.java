@@ -2,6 +2,8 @@ package com.kaup.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -10,14 +12,33 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
-    @ExceptionHandler(ContratoInvalidoException.class)
-    public ProblemDetail contratoInvalido(ContratoInvalidoException e) {
+    @ExceptionHandler(DadosInvalidosException.class)
+    public ProblemDetail dadosInvalidos(DadosInvalidosException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    // Mesma mensagem para e-mail inexistente e senha errada: não revela quais e-mails têm conta.
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail naoAutenticado(AuthenticationException e) {
+        String detalhe = e instanceof BadCredentialsException
+                ? "E-mail ou senha incorretos."
+                : "Entre na sua conta para continuar.";
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, detalhe);
+    }
+
+    @ExceptionHandler(OperacaoNaoPermitidaException.class)
+    public ProblemDetail naoPermitido(OperacaoNaoPermitidaException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
     @ExceptionHandler(DocumentoNaoEncontradoException.class)
     public ProblemDetail documentoNaoEncontrado(DocumentoNaoEncontradoException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
+    }
+
+    @ExceptionHandler(EmailJaCadastradoException.class)
+    public ProblemDetail emailJaCadastrado(EmailJaCadastradoException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

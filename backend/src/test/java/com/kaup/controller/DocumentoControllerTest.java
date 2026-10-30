@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -21,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.kaup.dto.AnaliseResponse;
@@ -31,6 +33,7 @@ import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.service.DocumentoService;
 
 @WebMvcTest(DocumentoController.class)
+@WithMockUser
 class DocumentoControllerTest {
 
     private static final String ID = "3f2a9c1e-5b7d-4c8a-9e0f-1a2b3c4d5e6f";
@@ -54,7 +57,7 @@ class DocumentoControllerTest {
     void uploadRetorna201NoFormatoQueOFrontendValida() throws Exception {
         when(documentoService.criar(any(), any())).thenReturn(documento());
 
-        mockMvc.perform(multipart("/api/documentos").file(arquivo()))
+        mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()))
                 .andExpect(status().isCreated())
                 .andExpect(header().string("Location", "/api/documentos/" + ID))
                 .andExpect(jsonPath("$.id").value(ID))
@@ -68,7 +71,7 @@ class DocumentoControllerTest {
     void uploadRepassaACategoriaInformada() throws Exception {
         when(documentoService.criar(any(), eq("Carros"))).thenReturn(documento());
 
-        mockMvc.perform(multipart("/api/documentos").file(arquivo()).param("categoryId", "Carros"))
+        mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()).param("categoryId", "Carros"))
                 .andExpect(status().isCreated());
 
         verify(documentoService).criar(any(), eq("Carros"));
@@ -79,7 +82,7 @@ class DocumentoControllerTest {
         when(documentoService.criar(any(), any()))
                 .thenThrow(new ContratoInvalidoException("Formato não suportado. Envie PDF, PNG ou JPEG."));
 
-        mockMvc.perform(multipart("/api/documentos").file(arquivo()))
+        mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Formato não suportado. Envie PDF, PNG ou JPEG."));
     }

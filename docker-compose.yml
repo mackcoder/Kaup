@@ -23,6 +23,11 @@ services:
       - DATABASE_URL=postgres://usuario_app:senha_segura@postgres:5432/gestao_contratos
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
+      # Conta de administrador (vê todos os documentos). Os padrões servem só para desenvolvimento:
+      # defina KAUP_ADMIN_PASSWORD no .env antes de publicar, ou KAUP_ADMIN_ENABLED=false.
+      - KAUP_ADMIN_ENABLED=${KAUP_ADMIN_ENABLED:-true}
+      - KAUP_ADMIN_EMAIL=${KAUP_ADMIN_EMAIL:-ADMIN@ADMIN}
+      - KAUP_ADMIN_PASSWORD=${KAUP_ADMIN_PASSWORD:-ADMIN}
     depends_on:
       - postgres
 

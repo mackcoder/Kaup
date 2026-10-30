@@ -4,6 +4,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.kaup.dto.MensagemChatResponse;
@@ -26,6 +28,7 @@ import com.kaup.exception.ServicoExternoException;
 import com.kaup.service.ChatService;
 
 @WebMvcTest(ChatController.class)
+@WithMockUser
 class ChatControllerTest {
 
     private static final String ID = "3f2a9c1e-5b7d-4c8a-9e0f-1a2b3c4d5e6f";
@@ -45,7 +48,7 @@ class ChatControllerTest {
     void perguntaRetorna201ComARespostaNoFormatoQueOFrontendValida() throws Exception {
         when(chatService.perguntar(ID, "Qual é a multa?")).thenReturn(mensagem("7", "assistant", "10%."));
 
-        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Qual é a multa?\"}"))
+        mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"Qual é a multa?\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value("7"))
                 .andExpect(jsonPath("$.documentId").value(ID))
@@ -60,14 +63,14 @@ class ChatControllerTest {
     void perguntaInvalidaRetorna400ComMensagemEmPortugues() throws Exception {
         when(chatService.perguntar(ID, " ")).thenThrow(new ContratoInvalidoException("Digite uma pergunta."));
 
-        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\" \"}"))
+        mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\" \"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value("Digite uma pergunta."));
     }
 
     @Test
     void corpoSemJsonValidoRetorna400() throws Exception {
-        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("isso não é json"))
+        mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("isso não é json"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -75,7 +78,7 @@ class ChatControllerTest {
     void falhaDaIaRetorna502() throws Exception {
         when(chatService.perguntar(ID, "oi")).thenThrow(new ServicoExternoException("IA (Gemini)", null));
 
-        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oi\"}"))
+        mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oi\"}"))
                 .andExpect(status().isBadGateway());
     }
 
@@ -84,7 +87,7 @@ class ChatControllerTest {
         when(chatService.perguntar(ID, "oi")).thenThrow(new DocumentoNaoEncontradoException());
         when(chatService.historico(ID)).thenThrow(new DocumentoNaoEncontradoException());
 
-        mockMvc.perform(post(URL).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oi\"}"))
+        mockMvc.perform(post(URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content("{\"message\":\"oi\"}"))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get(URL)).andExpect(status().isNotFound());
     }
