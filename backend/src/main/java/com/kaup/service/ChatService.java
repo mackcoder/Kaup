@@ -50,16 +50,21 @@ public class ChatService {
         String texto = validar(pergunta);
         Documento documento = documentoService.obterDoDono(documentoId, usuario); // 404 se não é seu
 
+        // Perfil lido a cada pergunta: mudar o nível de explicação ou bloquear a renda vale já na próxima.
+        PreferenciasDeIA preferencias = usuarios.findById(usuario.id())
+                .map(PreferenciasDeIA::de).orElse(PreferenciasDeIA.PADRAO);
+        boolean comRenda = preferencias.faixaDeRenda() != null;
+
         List<MensagemChat> recentes = new ArrayList<>(
                 repository.findByDocumentoIdOrderByIdDesc(documento.getId(), PageRequest.of(0, HISTORICO_MAX)));
         Collections.reverse(recentes); // a IA recebe da mais antiga para a mais recente
+        if (!comRenda) {
+            recentes = semRespostasComRenda(recentes);
+        }
         List<TurnoDeConversa> historico = recentes.stream()
                 .map(m -> new TurnoDeConversa(m.getPapel(), m.getConteudo()))
                 .toList();
 
-        // Perfil lido a cada pergunta: mudar o nível de explicação ou bloquear a renda vale já na próxima.
-        PreferenciasDeIA preferencias = usuarios.findById(usuario.id())
-                .map(PreferenciasDeIA::de).orElse(PreferenciasDeIA.PADRAO);
         String resposta = servicoDeIA.conversar(documento.getTextoExtraido(), historico, texto, preferencias);
         if (resposta == null || resposta.isBlank()) {
             throw new ServicoExternoException("IA", null);
@@ -67,6 +72,7 @@ public class ChatService {
 
         MensagemChat doUsuario = nova(documento, TurnoDeConversa.USUARIO, texto);
         MensagemChat daIa = nova(documento, TurnoDeConversa.ASSISTENTE, resposta.trim());
+        daIa.setComRenda(comRenda);
         repository.saveAll(List.of(doUsuario, daIa)); // uma transação; o id dá a ordem
         return paraResponse(daIa, documento);
     }
@@ -77,6 +83,27 @@ public class ChatService {
         return repository.findByDocumentoIdOrderByIdAsc(documento.getId()).stream()
                 .map(m -> paraResponse(m, documento))
                 .toList();
+    }
+
+    /**
+     * Quando a renda está bloqueada, tira do histórico as respostas que foram geradas com ela (e a
+     * pergunta de cada uma): elas podem citar a faixa, e reenviá-las seria enviar a renda por outro
+     * caminho. O que a própria pessoa digitou na conversa continua valendo.
+     */
+    private List<MensagemChat> semRespostasComRenda(List<MensagemChat> mensagens) {
+        List<MensagemChat> mantidas = new ArrayList<>();
+        for (int i = 0; i < mensagens.size(); i++) {
+            MensagemChat atual = mensagens.get(i);
+            boolean respostaComRenda = TurnoDeConversa.ASSISTENTE.equals(atual.getPapel()) && atual.usouRenda();
+            boolean perguntaDeRespostaComRenda = TurnoDeConversa.USUARIO.equals(atual.getPapel())
+                    && i + 1 < mensagens.size()
+                    && TurnoDeConversa.ASSISTENTE.equals(mensagens.get(i + 1).getPapel())
+                    && mensagens.get(i + 1).usouRenda();
+            if (!respostaComRenda && !perguntaDeRespostaComRenda) {
+                mantidas.add(atual);
+            }
+        }
+        return mantidas;
     }
 
     private String validar(String pergunta) {

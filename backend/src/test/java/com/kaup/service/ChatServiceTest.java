@@ -1,6 +1,8 @@
 package com.kaup.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -217,5 +219,85 @@ class ChatServiceTest {
         service.perguntar(documentoId.toString(), "oi", usuario);
 
         verify(servicoDeIA).conversar("texto do contrato", List.of(), "oi", new PreferenciasDeIA("simple", null));
+    }
+
+    // ---- bloqueio da renda vale também para o histórico ----
+
+    private MensagemChat respostaComRenda(long id, String conteudo) {
+        MensagemChat m = mensagem(id, "assistant", conteudo);
+        m.setComRenda(true);
+        return m;
+    }
+
+    private void perfilComRenda(boolean compartilhar) {
+        Usuario perfil = new Usuario();
+        perfil.setIncome("7to15");
+        perfil.setCompartilharRenda(compartilhar);
+        when(usuarios.findById(usuario.id())).thenReturn(Optional.of(perfil));
+    }
+
+    @Test
+    void comARendaBloqueadaAsRespostasQueUsaramARendaSaemDoHistorico() {
+        perfilComRenda(false);
+        // Mais recentes primeiro, como o repositório devolve.
+        when(repository.findByDocumentoIdOrderByIdDesc(eq(documentoId), any(Pageable.class))).thenReturn(List.of(
+                mensagem(6, "assistant", "resposta sem renda"),
+                mensagem(5, "user", "pergunta sobre o prazo"),
+                respostaComRenda(4, "sua renda é de 7 a 15 mil"),
+                mensagem(3, "user", "qual é a minha renda?"),
+                mensagem(2, "assistant", "resposta antiga sem renda"),
+                mensagem(1, "user", "pergunta antiga")));
+
+        service.perguntar(documentoId.toString(), "e agora?", usuario);
+
+        verify(servicoDeIA).conversar("texto do contrato", List.of(
+                new TurnoDeConversa("user", "pergunta antiga"),
+                new TurnoDeConversa("assistant", "resposta antiga sem renda"),
+                new TurnoDeConversa("user", "pergunta sobre o prazo"),
+                new TurnoDeConversa("assistant", "resposta sem renda")), "e agora?",
+                new PreferenciasDeIA("simple", null));
+    }
+
+    @Test
+    void comARendaLiberadaOHistoricoVaiInteiro() {
+        perfilComRenda(true);
+        when(repository.findByDocumentoIdOrderByIdDesc(eq(documentoId), any(Pageable.class))).thenReturn(List.of(
+                respostaComRenda(2, "sua renda é de 7 a 15 mil"),
+                mensagem(1, "user", "qual é a minha renda?")));
+
+        service.perguntar(documentoId.toString(), "e agora?", usuario);
+
+        verify(servicoDeIA).conversar("texto do contrato", List.of(
+                new TurnoDeConversa("user", "qual é a minha renda?"),
+                new TurnoDeConversa("assistant", "sua renda é de 7 a 15 mil")), "e agora?",
+                new PreferenciasDeIA("simple", "entre R$ 7.000 e R$ 15.000"));
+    }
+
+    @Test
+    void mensagensAntigasSemAMarcaContamComoSemRenda() {
+        perfilComRenda(false);
+        // A coluna é nova: as mensagens anteriores a ela têm valor nulo e não são descartadas.
+        when(repository.findByDocumentoIdOrderByIdDesc(eq(documentoId), any(Pageable.class))).thenReturn(List.of(
+                mensagem(2, "assistant", "resposta antiga"),
+                mensagem(1, "user", "pergunta antiga")));
+
+        service.perguntar(documentoId.toString(), "oi", usuario);
+
+        verify(servicoDeIA).conversar(eq("texto do contrato"), eq(List.of(
+                new TurnoDeConversa("user", "pergunta antiga"),
+                new TurnoDeConversa("assistant", "resposta antiga"))), eq("oi"), any());
+    }
+
+    @Test
+    void aRespostaGravadaLembraSeFoiGeradaComARenda() {
+        perfilComRenda(true);
+        service.perguntar(documentoId.toString(), "oi", usuario);
+        perfilComRenda(false);
+        service.perguntar(documentoId.toString(), "oi de novo", usuario);
+
+        ArgumentCaptor<List<MensagemChat>> gravadas = ArgumentCaptor.forClass(List.class);
+        verify(repository, org.mockito.Mockito.times(2)).saveAll(gravadas.capture());
+        assertTrue(gravadas.getAllValues().get(0).get(1).usouRenda());
+        assertFalse(gravadas.getAllValues().get(1).get(1).usouRenda());
     }
 }

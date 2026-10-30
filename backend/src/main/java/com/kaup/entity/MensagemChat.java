@@ -37,6 +37,14 @@ public class MensagemChat {
     @Column(columnDefinition = "TEXT")
     private String conteudo;
 
+    /**
+     * Verdadeiro nas respostas da IA geradas com a renda da pessoa no contexto. Se ela bloquear o
+     * envio da renda depois, essas respostas (que podem citá-la) saem do histórico enviado à IA.
+     * Nulo nas mensagens anteriores a esta coluna: contam como falso.
+     */
+    @Column(columnDefinition = "boolean default false")
+    private Boolean comRenda;
+
     private Instant criadoEm = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
     public Long getId() { return id; }
@@ -46,5 +54,7 @@ public class MensagemChat {
     public void setPapel(String papel) { this.papel = papel; }
     public String getConteudo() { return conteudo; }
     public void setConteudo(String conteudo) { this.conteudo = conteudo; }
+    public boolean usouRenda() { return Boolean.TRUE.equals(comRenda); }
+    public void setComRenda(boolean comRenda) { this.comRenda = comRenda; }
     public Instant getCriadoEm() { return criadoEm; }
 }
