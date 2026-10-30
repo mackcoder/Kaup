@@ -159,9 +159,60 @@ describe("adapter HTTP sem fallback", () => {
     );
     const service = new ApiService();
     expect(await service.health()).toContain("Backend");
-    await expect(service.attachContext()).rejects.toThrow(
-      "Nenhum arquivo foi enviado",
+  });
+  it("anexa contexto como multipart e lista principal mais anexos", async () => {
+    const anexo = {
+      id: "4",
+      documentId: "d1",
+      name: "aditivo.pdf",
+      mimeType: "application/pdf",
+      createdAt: "2026-10-30T12:00:00Z",
+    };
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(anexo, { status: 201 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "d1",
+          name: "contrato.pdf",
+          categoryId: null,
+          processingStatus: "completed",
+          createdAt: "2026-10-30T12:00:00Z",
+        }),
+      )
+      .mockResolvedValueOnce(Response.json([anexo]));
+    vi.stubGlobal("fetch", fetcher);
+    const service = new ApiService("http://localhost:8080");
+    const file = new File(["x"], "aditivo.pdf", { type: "application/pdf" });
+    const anexado = await service.attachContext("d1", file);
+    expect(anexado).toEqual({ emoji: "📑", name: "aditivo.pdf", type: "Anexo" });
+    const [url, init] = fetcher.mock.calls[0];
+    expect(String(url)).toContain("/api/documentos/d1/contexto");
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    const lista = await service.getContext("d1");
+    expect(lista.map((c) => c.name)).toEqual(["contrato.pdf", "aditivo.pdf"]);
+    expect(lista[0].isMain).toBe(true);
+  });
+  it("recusa anexo de outro documento", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          id: "4",
+          documentId: "outro",
+          name: "x.pdf",
+          mimeType: "application/pdf",
+          createdAt: "2026-10-30T12:00:00Z",
+        }),
+      ),
     );
+    await expect(
+      new ApiService("http://localhost:8080").attachContext(
+        "d1",
+        new File(["x"], "x.pdf"),
+      ),
+    ).rejects.toThrow("outro documento");
   });
   it("normaliza falha de rede", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));

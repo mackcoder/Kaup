@@ -66,7 +66,7 @@ public class DocumentoService {
         }
 
         Documento documento = new Documento();
-        documento.setNome(nomeSeguro(arquivo.getOriginalFilename()));
+        documento.setNome(nomeSeguro(arquivo.getOriginalFilename(), "Documento"));
         documento.setMimeType(arquivo.getContentType());
         documento.setCategoryId(categoria);
         documento.setProcessingStatus(STATUS_CONCLUIDO);
@@ -201,14 +201,14 @@ public class DocumentoService {
     }
 
     // O nome vem do cliente: descarta caminhos (C:\pasta\arquivo.pdf, ../arquivo.pdf) e limita o tamanho.
-    private String nomeSeguro(String nomeOriginal) {
+    static String nomeSeguro(String nomeOriginal, String padrao) {
         if (nomeOriginal == null || nomeOriginal.isBlank()) {
-            return "Documento";
+            return padrao;
         }
         String nome = nomeOriginal.replace('\\', '/');
         nome = nome.substring(nome.lastIndexOf('/') + 1).trim();
         if (nome.isEmpty()) {
-            return "Documento";
+            return padrao;
         }
         return nome.length() > TAMANHO_MAX_NOME ? nome.substring(0, TAMANHO_MAX_NOME) : nome;
     }

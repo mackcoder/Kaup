@@ -13,6 +13,8 @@ export const endpoints = {
   profile: "/api/perfil",
   document: (id: string) => `/api/documentos/${encodeURIComponent(id)}`,
   analysis: (id: string) => `/api/documentos/${encodeURIComponent(id)}/analise`,
+  context: (id: string) =>
+    `/api/documentos/${encodeURIComponent(id)}/contexto`,
   messages: (id: string) =>
     `/api/documentos/${encodeURIComponent(id)}/chat/mensagens`,
 };

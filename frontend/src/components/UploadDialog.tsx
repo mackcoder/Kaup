@@ -28,6 +28,9 @@ export default function UploadDialog({
     photoRef = useRef<HTMLInputElement>(null),
     request = useRef<AbortController | null>(null);
   const cat = categories.find((c) => c.key === categoryId);
+  const confirmTitle = contextId
+    ? "Adicionar ao contexto"
+    : "Confirmar documento";
   useEffect(() => {
     if (initialCapture) photoRef.current?.click();
   }, [initialCapture]);
@@ -83,10 +86,7 @@ export default function UploadDialog({
     }
   }
   return (
-    <Modal
-      label={file ? "Confirmar documento" : "Como deseja enviar?"}
-      onClose={close}
-    >
+    <Modal label={file ? confirmTitle : "Como deseja enviar?"} onClose={close}>
       {cat && (
         <div
           className="category-pill"
@@ -100,7 +100,7 @@ export default function UploadDialog({
         </div>
       )}
       <h2 className="sheet-title">
-        {file ? "Confirmar documento" : "Como deseja enviar?"}
+        {file ? confirmTitle : "Como deseja enviar?"}
       </h2>
       <p className="sheet-subtitle">
         {file
@@ -127,7 +127,9 @@ export default function UploadDialog({
           <p className="demo-copy">
             {service.mode === "mock"
               ? "Demonstração: o arquivo não sai do navegador. Não haverá OCR nem análise real."
-              : "O arquivo é lido no servidor para gerar o resumo. Isso pode levar alguns segundos."}
+              : contextId
+                ? "O texto do arquivo é lido no servidor e passa a ser usado nas próximas respostas do chat."
+                : "O arquivo é lido no servidor para gerar o resumo. Isso pode levar alguns segundos."}
           </p>
           <button
             className="primary-button wide"

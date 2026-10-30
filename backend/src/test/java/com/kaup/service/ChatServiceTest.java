@@ -33,6 +33,8 @@ import com.kaup.entity.MensagemChat;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.exception.ServicoExternoException;
+import com.kaup.entity.AnexoContexto;
+import com.kaup.repository.AnexoContextoRepository;
 import com.kaup.repository.MensagemChatRepository;
 import com.kaup.repository.UsuarioRepository;
 import com.kaup.security.UsuarioLogado;
@@ -44,6 +46,7 @@ class ChatServiceTest {
     private MensagemChatRepository repository;
     private UsuarioRepository usuarios;
     private ServicoDeIA servicoDeIA;
+    private AnexoContextoRepository anexos;
     private ChatService service;
     private Documento documento;
     private final UsuarioLogado usuario = new UsuarioLogado(UUID.randomUUID(), "ana@exemplo.com", Papel.USER, null);
@@ -54,7 +57,8 @@ class ChatServiceTest {
         repository = mock(MensagemChatRepository.class);
         usuarios = mock(UsuarioRepository.class);
         servicoDeIA = mock(ServicoDeIA.class);
-        service = new ChatService(documentoService, repository, usuarios, servicoDeIA);
+        anexos = mock(AnexoContextoRepository.class);
+        service = new ChatService(documentoService, repository, usuarios, servicoDeIA, anexos);
 
         documento = new Documento();
         ReflectionTestUtils.setField(documento, "id", documentoId);
@@ -299,5 +303,20 @@ class ChatServiceTest {
         verify(repository, org.mockito.Mockito.times(2)).saveAll(gravadas.capture());
         assertTrue(gravadas.getAllValues().get(0).get(1).usouRenda());
         assertFalse(gravadas.getAllValues().get(1).get(1).usouRenda());
+    }
+
+    @Test
+    void anexosVaoDepoisDoContratoSobUmMarcador() {
+        AnexoContexto aditivo = new AnexoContexto();
+        aditivo.setNome("aditivo.pdf");
+        aditivo.setTextoExtraido("multa passa a 5%");
+        when(anexos.findByDocumentoIdOrderByIdAsc(documentoId)).thenReturn(List.of(aditivo));
+        when(servicoDeIA.conversar(any(), any(), any(), any())).thenReturn("ok");
+
+        service.perguntar(documentoId.toString(), "Qual é a multa?", usuario);
+
+        verify(servicoDeIA).conversar(
+                "texto do contrato\n\n=== ANEXO: aditivo.pdf ===\nmulta passa a 5%",
+                List.of(), "Qual é a multa?", PreferenciasDeIA.PADRAO);
     }
 }

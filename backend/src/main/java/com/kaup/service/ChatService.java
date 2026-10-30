@@ -9,10 +9,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.kaup.dto.MensagemChatResponse;
+import com.kaup.entity.AnexoContexto;
 import com.kaup.entity.Documento;
 import com.kaup.entity.MensagemChat;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.ServicoExternoException;
+import com.kaup.repository.AnexoContextoRepository;
 import com.kaup.repository.MensagemChatRepository;
 import com.kaup.repository.UsuarioRepository;
 import com.kaup.security.UsuarioLogado;
@@ -30,11 +32,14 @@ public class ChatService {
     private final MensagemChatRepository repository;
     private final UsuarioRepository usuarios;
     private final ServicoDeIA servicoDeIA;
+    private final AnexoContextoRepository anexos;
 
     public ChatService(DocumentoService documentoService, MensagemChatRepository repository,
-                       UsuarioRepository usuarios, ServicoDeIA servicoDeIA) {
+                       UsuarioRepository usuarios, ServicoDeIA servicoDeIA,
+                       AnexoContextoRepository anexos) {
         this.documentoService = documentoService;
         this.repository = repository;
+        this.anexos = anexos;
         this.usuarios = usuarios;
         this.servicoDeIA = servicoDeIA;
     }
@@ -65,7 +70,7 @@ public class ChatService {
                 .map(m -> new TurnoDeConversa(m.getPapel(), m.getConteudo()))
                 .toList();
 
-        String resposta = servicoDeIA.conversar(documento.getTextoExtraido(), historico, texto, preferencias);
+        String resposta = servicoDeIA.conversar(textoComAnexos(documento), historico, texto, preferencias);
         if (resposta == null || resposta.isBlank()) {
             throw new ServicoExternoException("IA", null);
         }
@@ -104,6 +109,19 @@ public class ChatService {
             }
         }
         return mantidas;
+    }
+
+    /**
+     * Contrato principal seguido dos anexos, cada um sob um marcador. Tudo segue como dado do
+     * contrato: o prompt da IA manda ignorar instruções que apareçam dentro dele.
+     */
+    private String textoComAnexos(Documento documento) {
+        StringBuilder texto = new StringBuilder(documento.getTextoExtraido());
+        for (AnexoContexto anexo : anexos.findByDocumentoIdOrderByIdAsc(documento.getId())) {
+            texto.append("\n\n=== ANEXO: ").append(anexo.getNome()).append(" ===\n")
+                    .append(anexo.getTextoExtraido());
+        }
+        return texto.toString();
     }
 
     private String validar(String pergunta) {

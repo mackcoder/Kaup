@@ -11,13 +11,16 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kaup.dto.ExportacaoResponse;
 import com.kaup.dto.ExportacaoResponse.Conta;
+import com.kaup.dto.ExportacaoResponse.Anexo;
 import com.kaup.dto.ExportacaoResponse.Mensagem;
 import com.kaup.dto.ExportacaoResponse.Preferencias;
 import com.kaup.entity.Documento;
+import com.kaup.entity.AnexoContexto;
 import com.kaup.entity.MensagemChat;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
 import com.kaup.repository.DocumentoRepository;
+import com.kaup.repository.AnexoContextoRepository;
 import com.kaup.repository.MensagemChatRepository;
 import com.kaup.repository.UsuarioRepository;
 
@@ -28,13 +31,16 @@ public class ExportacaoService {
     private final UsuarioRepository usuarios;
     private final DocumentoRepository documentos;
     private final MensagemChatRepository mensagens;
+    private final AnexoContextoRepository anexos;
     private final ObjectMapper json;
 
     public ExportacaoService(UsuarioRepository usuarios, DocumentoRepository documentos,
-                             MensagemChatRepository mensagens, ObjectMapper json) {
+                             MensagemChatRepository mensagens, AnexoContextoRepository anexos,
+                             ObjectMapper json) {
         this.usuarios = usuarios;
         this.documentos = documentos;
         this.mensagens = mensagens;
+        this.anexos = anexos;
         this.json = json;
     }
 
@@ -60,7 +66,17 @@ public class ExportacaoService {
                 .map(this::mensagem)
                 .toList();
         return new ExportacaoResponse.Documento(d.getId().toString(), d.getNome(), d.getCategoryId(), d.getMimeType(),
-                d.getProcessingStatus(), d.getCriadoEm().toString(), d.getTextoExtraido(), analise(d), conversa);
+                d.getProcessingStatus(), d.getCriadoEm().toString(), d.getTextoExtraido(), analise(d), conversa, anexosDe(d));
+    }
+
+    private List<Anexo> anexosDe(Documento d) {
+        return anexos.findByDocumentoIdOrderByIdAsc(d.getId()).stream()
+                .map(this::anexo)
+                .toList();
+    }
+
+    private Anexo anexo(AnexoContexto a) {
+        return new Anexo(a.getNome(), a.getMimeType(), a.getCriadoEm().toString(), a.getTextoExtraido());
     }
 
     private Mensagem mensagem(MensagemChat m) {

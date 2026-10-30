@@ -12,6 +12,7 @@ import {
   documentFromDTO,
   analysisFromDTO,
   messageFromDTO,
+  contextFileFromDTO,
   profileFromDTO,
   authUserFromDTO,
   string,
@@ -127,13 +128,32 @@ export class ApiService implements KaupService {
     return { reply: m, followUps: [] };
   }
   async getContext(id: string, signal?: AbortSignal) {
-    const doc = await this.getDocument(id, signal);
-    return [{ emoji: "📄", name: doc.name, type: "Principal", isMain: true }];
+    const [doc, anexos] = await Promise.all([
+      this.getDocument(id, signal),
+      this.request(e.context(id), { signal }),
+    ]);
+    return [
+      { emoji: "📄", name: doc.name, type: "Principal", isMain: true },
+      ...this.anexosDe(id, anexos),
+    ];
   }
-  async attachContext(): Promise<ContextFile> {
-    throw new ApiError(
-      "Anexar contexto depende de um contrato backend ainda não definido. Nenhum arquivo foi enviado.",
+  async attachContext(id: string, file: File, signal?: AbortSignal) {
+    const body = new FormData();
+    body.append("file", file);
+    const [anexo] = this.anexosDe(
+      id,
+      [await this.request(e.context(id), { method: "POST", body, signal })],
     );
+    return anexo;
+  }
+  // Os anexos de outro documento nunca entram na lista: o id da URL manda.
+  private anexosDe(id: string, value: unknown): ContextFile[] {
+    return array(value).map((item) => {
+      const { documentId, ...anexo } = contextFileFromDTO(item);
+      if (documentId !== id)
+        throw new ApiError("Anexo recebido para outro documento.");
+      return anexo;
+    });
   }
   async getProfile(signal?: AbortSignal) {
     return profileFromDTO(await this.request(e.profile, { signal }));

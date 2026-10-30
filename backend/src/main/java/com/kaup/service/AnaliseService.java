@@ -27,13 +27,19 @@ public class AnaliseService {
     /** Arquivo do contrato -> OCR -> IA -> análise estruturada. */
     public AnaliseContratoResponse analisarArquivo(MultipartFile arquivo, PreferenciasDeIA preferencias)
             throws IOException {
+        String texto = extrairTexto(arquivo);
+        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto, preferencias));
+    }
+
+    /** Valida o arquivo e devolve o texto lido por OCR; falha se não houver texto legível. */
+    public String extrairTexto(MultipartFile arquivo) throws IOException {
         validar(arquivo);
         String texto = ocrService.extrairTexto(arquivo);
         if (texto == null || texto.isBlank()) {
             throw new ContratoInvalidoException(
                     "Não foi possível ler texto no arquivo enviado. Tente uma foto mais nítida.");
         }
-        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto, preferencias));
+        return texto;
     }
 
     /** Mesmo fluxo a partir de texto já extraído (pula o OCR). */

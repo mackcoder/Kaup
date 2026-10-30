@@ -5,6 +5,7 @@ import type {
   ProcessingStatus,
   UserProfile,
   ChatMessage,
+  ContextFile,
 } from "../../types/domain";
 import { ApiError } from "./http";
 export interface DocumentDTO {
@@ -119,6 +120,18 @@ export function messageFromDTO(value: unknown): ChatMessage {
     text: string(m.content),
     createdAt: string(m.createdAt),
     state: "sent",
+  };
+}
+export function contextFileFromDTO(value: unknown): ContextFile & {
+  documentId: string;
+} {
+  const a = record(value);
+  const mime = typeof a.mimeType === "string" ? a.mimeType : "";
+  return {
+    documentId: string(a.documentId),
+    emoji: mime.startsWith("image/") ? "🖼️" : "📑",
+    name: string(a.name),
+    type: "Anexo",
   };
 }
 export function profileFromDTO(value: unknown): UserProfile {

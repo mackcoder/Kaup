@@ -24,6 +24,7 @@ import com.kaup.entity.Documento;
 import com.kaup.entity.MensagemChat;
 import com.kaup.entity.Usuario;
 import com.kaup.exception.DadosInvalidosException;
+import com.kaup.repository.AnexoContextoRepository;
 import com.kaup.repository.DocumentoRepository;
 import com.kaup.repository.MensagemChatRepository;
 import com.kaup.repository.UsuarioRepository;
@@ -43,7 +44,7 @@ class ExportacaoServiceTest {
         usuarios = mock(UsuarioRepository.class);
         documentos = mock(DocumentoRepository.class);
         mensagens = mock(MensagemChatRepository.class);
-        service = new ExportacaoService(usuarios, documentos, mensagens, new ObjectMapper());
+        service = new ExportacaoService(usuarios, documentos, mensagens, mock(AnexoContextoRepository.class), new ObjectMapper());
 
         ana = new Usuario();
         ReflectionTestUtils.setField(ana, "id", anaId);

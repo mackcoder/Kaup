@@ -16,7 +16,10 @@ public record ExportacaoResponse(String exportedAt, Conta account, List<Document
                                boolean shareIncomeWithAi) { }
 
     public record Documento(String id, String name, String categoryId, String mimeType, String processingStatus,
-                            String createdAt, String extractedText, JsonNode analysis, List<Mensagem> messages) { }
+                            String createdAt, String extractedText, JsonNode analysis, List<Mensagem> messages,
+                            List<Anexo> attachments) { }
+
+    public record Anexo(String name, String mimeType, String createdAt, String extractedText) { }
 
     public record Mensagem(String role, String text, String createdAt) { }
 }

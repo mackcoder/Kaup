@@ -450,10 +450,26 @@ Decisões do usuário: login por **e-mail e senha**; sessão em **cookie guardad
 
 ### Fase 6 — Extras
 - [ ] Upload assíncrono (`202`) com executor próprio
-- [ ] Anexar contexto (`attachContext`) — definir contrato antes
-- [ ] Narração (RF07) e entrada por voz (RF06)
+- [x] Anexar contexto (`attachContext`) — ver "Fase 6a" abaixo
+- [ ] Narração (RF07) e entrada por voz (RF06) — decidido: Web Speech API, só no navegador
 - [ ] CI com teste de integração (backend + Postgres) e e2e do frontend em modo API
 - [ ] Atualizar `frontend/API_CONTRACT_RASCUNHO.md` com o contrato final
+
+#### Fase 6a — Anexar contexto (2026-10-30)
+
+**Contrato:** `POST /api/documentos/{id}/contexto` (multipart, campo `file`, só o dono; 201 com `{id, documentId, name, mimeType, createdAt}`) e `GET` da mesma rota (lista, para quem pode ler o documento). Mesmos tipos e limite de tamanho do upload; até 5 anexos por documento e 30.000 caracteres de texto por anexo (o excedente é cortado).
+
+- Backend: entidade `AnexoContexto` (só o texto extraído, apagada em cascata com o documento, o que cobre exclusão, exclusão de conta e retenção); `ContextoService`/`ContextoController`; `AnaliseService.extrairTexto` reaproveitado. O chat envia os anexos depois do contrato, cada um sob `=== ANEXO: nome ===`, e o prompt manda tratá-los como material de apoio e dizer de qual anexo veio a informação. A exportação traz `attachments`.
+- Frontend: `attachContext`/`getContext` no `ApiService` (principal + anexos; anexo de outro documento é recusado); o diálogo de envio usa título e texto próprios quando é um anexo.
+- Testes: backend 151 (eram 142); frontend 113 (eram 111).
+
+**Verificado de verdade** (backend no Docker, `gemini-3.5-flash-lite`, conta temporária apagada no fim): antes do anexo o chat respondeu R$ 1.500,00 e multa de 10%; depois de anexar um termo aditivo, R$ 1.650,00 e 2%, citando o aditivo. `.txt` → 400, documento inexistente → 404, exportação com o anexo, excluir o documento apagou o anexo no banco. No Chrome sem cabeça: contador de contexto 1 → 2, popup lista "aditivo.pdf · Anexo", resposta do chat usa o aditivo, F5 mantém o anexo. Único erro no console: um 404, provavelmente do `/favicon.ico`, que o projeto não tem.
+
+**Ressalvas**
+- Sem exclusão de um anexo isolado: ele só some com o documento.
+- Na primeira pergunta pela API a IA não mencionou o "a partir de janeiro" do aditivo; quando a pergunta citou janeiro, respondeu certo. Anexos que valem só a partir de uma data dependem da IA perceber isso.
+- O texto dos anexos também vai ao Gemini (mesma ressalva de LGPD do contrato).
+- No chat, "Tirar foto" e "Enviar arquivo" do menu "+" também viram anexo (já era assim no frontend).
 
 ---
 
