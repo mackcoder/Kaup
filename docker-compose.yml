@@ -36,14 +36,5 @@ services:
     depends_on:
       - postgres
 
-  frontend:
-    build: ./frontend
-    container_name: app_frontend
-    restart: always
-    ports:
-      - "5173:5173"
-    depends_on:
-      - backend
-
 volumes:
   postgres_data:
