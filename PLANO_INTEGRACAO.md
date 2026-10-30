@@ -6,6 +6,8 @@
 
 ## 1. Resumo do estado atual
 
+> **Atualização (2026-10-30):** este resumo e a tabela da §2 descrevem o estado **antes** da integração e foram mantidos como registro. Hoje as Fases 0 a 5 estão feitas (upload, análise, categorização, chat, perfil, contas e exclusão); o que ficou de fora está nas ressalvas de cada fase da §7 e no fim da Fase 5.
+
 **Backend (`backend/`, Java 17 / Spring Boot / JPA / PostgreSQL / Tess4J / PDFBox)** — existe um único fluxo real, **síncrono e sem estado**:
 
 - `GET /api/analise/health` → texto simples.
@@ -205,8 +207,8 @@ O `API_CONTRACT_RASCUNHO.md` diz que o backend precisa aprovar o contrato. **Rec
 | **1 — Fatia vertical: upload → resumo** | Primeiro fluxo real ponta a ponta | `Documento` + persistência; `POST /api/documentos`; `GET …/{id}` e `GET …/{id}/analise` com mapeamento; `http.ts` lendo `ProblemDetail`; timeout ajustado; testar com `VITE_DATA_SOURCE=api` | 3, 4, 5, 7, 18 |
 | **2 — Documentos persistidos** | Tela inicial e listas com dados reais | ~~`GET /api/documentos`; `visualStatus`/`description`~~ (feitos na Fase 1); ~~categorização via Gemini~~ (feita) | 6, 8 |
 | **3 — Chat** | Perguntas sobre o contrato | Método de conversa no `GeminiService`; entidade `MensagemChat`; `POST/GET …/chat/mensagens`; validar o comportamento de `ChatPage` em modo API | 9, 10 |
-| **4 — Perfil e personalização** | Preferências valem de verdade | `GET/PATCH /api/perfil`; injeção de `explainLevel`/`income` no prompt. *Sem auth, é um perfil global — só para demo.* | 11, 12 |
-| **5 — Conta e privacidade** | Pré-requisito para dados reais de pessoas | Spring Security, `Usuario`, `usuarioId` em tudo, 401/403, UI de login, `DELETE` de documento (+ botão), exclusão de conta, política LGPD. **Não publicar com dados reais antes desta fase.** | 13, 14, 17 |
+| **4 — Contas e perfil** | Cada pessoa com sua conta e suas preferências (a conta passou a vir antes do perfil, a pedido do usuário) | ~~`GET/PATCH /api/perfil`; `explainLevel`/`income` no prompt~~ (feito, por conta); Spring Security, cadastro, login e sessão; documentos por dono; admin | 11, 12, 13 |
+| **5 — Exclusão e privacidade** | Pré-requisito para dados reais de pessoas | ~~`DELETE` de documento (+ botão), exclusão de conta~~ (feitos junto com a Fase 4); política LGPD, exportação, limite de login, HTTPS. **Não publicar com dados reais antes de fechar o que sobrou.** | 14, 17 |
 | **6 — Extras** | Itens de requisito restantes | Assíncrono (202 + polling), anexar contexto, narração/voz, CI com teste de integração | 15, 16 |
 
 Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior risco e destrava tudo o mais. As Fases 2–3 usam a mesma base. Perfil é isolado e não bloqueia documentos. Auth vem depois do MVP funcional, mas antes de qualquer uso real, e mudar para auth depois exige apenas adicionar `usuarioId` e credenciais no `http.ts` (o resto do contrato permanece).
@@ -351,20 +353,68 @@ Racional: a Fase 1 prova OCR + IA + persistência + contrato, que é o maior ris
 - **A resposta da IA não tem limite de tamanho** (`maxOutputTokens` não configurado).
 - **Perguntas simultâneas no mesmo documento** podem intercalar mensagens no histórico (sem controle de concorrência).
 
-### Fase 4 — Perfil
-- [ ] Entidade de perfil com defaults compatíveis com `profileFromDTO`
-- [ ] `GET/PATCH /api/perfil` (validar enums no servidor)
-- [ ] Passar `explainLevel` (e `income` quando informado) ao prompt do `GeminiService`
-- [ ] Testar edição de perfil na `ProfilePage` em modo API
+### Fase 4 — Contas e perfil (executada em 2026-10-30)
+Decisões do usuário: login por **e-mail e senha**; sessão em **cookie guardado no Postgres**; conta de administrador `ADMIN@ADMIN` / `ADMIN` que **vê todos os documentos**; os documentos antigos ficam com o **primeiro usuário comum** que se cadastrar; a renda **pode ir ao Gemini**, com um bloqueio nas Configurações; a análise já feita **não é refeita** quando o perfil muda, e os próximos chats usam a opção nova.
 
-### Fase 5 — Conta e privacidade
-- [ ] Escolher estratégia de auth e adicionar Spring Security
-- [ ] `Usuario` + `usuarioId` em documentos/perfil/mensagens; checagem de dono em todo acesso por id
-- [ ] Frontend: telas de cadastro/login, envio de credenciais no `http.ts`, tratamento de 401
-- [ ] `DELETE /api/documentos/{id}` + ação na UI (hoje inexistente)
-- [ ] Exclusão de conta e exportação de dados
+- [x] Spring Security com sessão em cookie `HttpOnly` + `SameSite=Lax`, guardada no Postgres (reiniciar o backend não desloga ninguém), e proteção CSRF (cookie `XSRF-TOKEN` + cabeçalho `X-XSRF-TOKEN`)
+- [x] `POST /api/auth/cadastro` (nome, e-mail, senha de 8 a 72 caracteres, confirmação), `/entrar`, `/sair`, `GET /eu`; senhas com BCrypt; e-mail único em minúsculas; e-mail inexistente e senha errada dão a mesma mensagem
+- [x] Todo o resto da API exige login (401 e 403 em RFC 7807); só o `health` e as rotas de cadastro e entrada são públicas
+- [x] Conta de administrador criada na subida (configurável por `KAUP_ADMIN_*`), com aviso no log enquanto a senha for a padrão
+- [x] `Documento.dono` (apagado em cascata com a conta); listar, abrir, analisar e ver o chat só para o dono; o administrador **lê** tudo mas **não altera** o que é dos outros (403 explicando); para outra pessoa o documento "não existe" (404)
+- [x] O primeiro usuário comum adota os documentos de antes das contas
+- [x] `GET/PATCH /api/perfil` por conta (PATCH parcial, valida tudo antes de gravar); `shareIncomeWithAi` bloqueia o envio da renda
+- [x] Preferências na IA: o chat lê o perfil a cada pergunta (nível de explicação + renda, se permitida); a análise lê no envio e usa só o nível de explicação; nome e e-mail nunca vão
+- [x] Frontend: telas de entrar e criar conta, guarda de rotas que mantém o endereço pedido, token CSRF no `http.ts`, volta ao login se a sessão expirar, perfil e conversas da pessoa anterior descartados ao sair
+- [x] Frontend: interruptor "Deixar a IA usar minha renda", selo de administrador no perfil
+- [x] CI: o smoke test passa a cadastrar, entrar com cookie e CSRF, e conferir perfil, 401, 404, 400 e exclusão da conta
+- [x] Documentação: `.env.example` na raiz e seção "Running locally" no README
+
+**Resultados medidos:** `mvn verify` com 106 testes e `BUILD SUCCESS` (eram 46); frontend com 93 testes (eram 52), `tsc`, lint e build limpos.
+
+| Verificação (backend real no Docker) | Resultado |
+|---|---|
+| Sem login `GET /api/documentos` | 401; só o `health` é público |
+| Login sem o token CSRF | 403 |
+| Senha errada / e-mail inexistente | 401 com a mesma mensagem |
+| Cookie de sessão | `HttpOnly; SameSite=Lax`; sobrevive ao reinício do backend |
+| Cadastro: senhas diferentes, senha curta, e-mail inválido, e-mail repetido | 400, 400, 400, 409 (mensagens em português) |
+| 1º usuário comum se cadastra | adota os 17 documentos antigos; o 2º usuário não herda nada |
+| Usuário A tenta abrir, analisar, ver o chat, perguntar ou apagar o documento de B | 404 em tudo |
+| Administrador | lista os 18 documentos; lê, vê análise e chat; pergunta ou apaga em documento alheio → 403; tenta apagar a própria conta → 403 |
+| Dono apaga o documento | 204; as mensagens somem junto (cascata do banco) |
+| Perfil | padrões corretos; PATCH parcial; valores inválidos → 400 e nada é gravado; e-mail de outra conta → 409 |
+| Chat com a renda **permitida** (faixa R$ 3.000–5.000) | a IA usa a renda: "parcela de R$ 520 ≈ 10% da sua renda" |
+| Mesma pergunta com a renda **bloqueada** | "o contrato não traz a sua renda… não é possível saber" |
+| Excluir a conta com 2 sessões abertas | 204; usuário, documentos, mensagens e as duas sessões somem; as duas voltam a dar 401 |
+| Os 8 passos do smoke test do CI, executados contra o backend local | passam |
+| **Navegador real** (Chrome headless): criar conta, F5, enviar contrato, perfil, sair, entrar com senha errada e certa, administrador, excluir documento e conta | tudo passou; 0 erros de JavaScript |
+
+**Problemas que os testes e o ensaio no navegador acharam, já corrigidos:**
+- `Set.of(email, email)` lançava exceção ao excluir uma conta (os dois e-mails são iguais no caso comum); só um teste unitário pegou, antes de ir ao ar.
+- Salvar o perfil reenviava o perfil inteiro a partir do estado da tela: com a latência real, dois cliques seguidos faziam o segundo **desfazer o primeiro** (o nível "Completa" voltava para "Simples"). Agora o PATCH leva só o campo alterado.
+- O rótulo do botão "Mostrar senha" repetia o nome do campo ("Mostrar crie uma senha").
+- O `csrf()` do `spring-security-test` troca o repositório de CSRF compartilhado e mascarava a configuração real; os testes de login passaram a enviar o token como o frontend.
+
+**Ressalvas e pendências desta fase:**
+- **A conta `ADMIN@ADMIN` / `ADMIN` é só para desenvolvimento.** Qualquer pessoa que souber disso entra com acesso de leitura a todos os contratos. Antes de publicar: definir `KAUP_ADMIN_PASSWORD` (ou `KAUP_ADMIN_ENABLED=false`). O backend avisa no log a cada subida enquanto a senha for a padrão.
+- **O administrador lê todos os contratos de todas as pessoas, por desenho.** Isso precisa constar na política de privacidade.
+- **Sem limite de tentativas de login** (o usuário não escolheu incluir): senhas podem ser testadas à vontade.
+- **Sem redefinição de senha nem confirmação de e-mail:** quem esquece a senha perde a conta.
+- **Cookie sem `Secure` e sem CORS configurado**, pois o desenvolvimento usa HTTP e o proxy do Vite. Para publicar: HTTPS, `server.servlet.session.cookie.secure=true` e a origem liberada.
+- **A coluna antiga `usuario_id` da tabela `documento`** foi removida do banco local à mão; bancos de outras pessoas podem ainda tê-la (inofensiva, vazia).
+- **Os 17 documentos antigos** ficam sem dono até o primeiro usuário comum se cadastrar.
+- **Poucas combinações testadas:** um usuário comum, o administrador e dois usuários em paralelo; nada de carga ou de concorrência real.
+- **O campo `audio` do perfil** só é guardado: não há narração (Fase 6).
+
+### Fase 5 — Privacidade (parte feita junto com a Fase 4)
+- [x] Spring Security, `Usuario`, dono nos documentos, checagem de dono em todo acesso por id
+- [x] Telas de cadastro e login, credenciais (cookie) no `http.ts`, tratamento de 401
+- [x] `DELETE /api/documentos/{id}` + botão "Excluir documento" (com confirmação) para o dono
+- [x] Exclusão de conta (apaga documentos e conversas e encerra as sessões)
+- [ ] Exportação dos dados da pessoa ("Baixar minhas informações" continua sem função)
 - [ ] Definir retenção do texto extraído e consentimento (LGPD); avaliar anonimização antes do Gemini
-- [ ] CORS/HTTPS para o ambiente de deploy (RNF02)
+- [ ] Limite de tentativas de login, redefinição de senha
+- [ ] CORS, HTTPS e cookie `Secure` para o ambiente de deploy (RNF02); trocar a senha do administrador
 
 ### Fase 6 — Extras
 - [ ] Upload assíncrono (`202`) com executor próprio
