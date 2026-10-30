@@ -1,13 +1,13 @@
 # Kaup — frontend refatorado
 
-Aplicação executável e independente em `frontend-novo/`, com as cinco telas do protótipo, aparência original, React 19, TypeScript estrito, Vite e React Router. O frontend e backend originais foram somente lidos.
+Aplicação com as cinco telas do protótipo, aparência original, React 19, TypeScript estrito, Vite e React Router.
 
 ## Executar
 
 Requer Node **22.12+** (validado com 22.23.3) e npm.
 
 ```bash
-cd frontend-novo
+cd frontend
 npm install
 npm run dev
 ```
@@ -79,7 +79,7 @@ npm run dev
 
 Com URL vazia, `/api` usa o proxy Vite para `http://localhost:8080`. Alternativamente, configure `VITE_API_BASE_URL=http://localhost:8080` e libere a origem no CORS do backend. A URL é a **origem**, sem sufixo `/api`. Em produção, o proxy de desenvolvimento não existe: configure reverse proxy `/api` ou a origem explícita. `VITE_API_TIMEOUT_MS` controla o limite por requisição, padrão 20000 ms. Variáveis `VITE_*` entram no bundle: nunca incluir segredos nelas.
 
-**Confirmado no código backend:** somente `GET /api/analise/health`, que retorna texto e não comprova funcionamento de OCR, IA ou banco. `health()` existe no adapter, separado dos fluxos de documentos.
+**Existe no backend hoje:** `GET /api/analise/health` (texto; não comprova OCR, IA ou banco), `POST /api/analise/contrato` (multipart, campo `arquivo`) e `POST /api/analise/texto`. Os dois últimos não são usados pelo frontend. Ver `../PLANO_INTEGRACAO.md`.
 
 **Preparados no frontend, ainda propostos no backend:**
 
@@ -97,31 +97,9 @@ A API valida respostas recebidas e rejeita JSON incompatível, HTML de fallback,
 
 Nenhum contrato de autenticação foi inventado. Antes de usar documentos reais, a equipe deverá implementar autenticação/autorização no Spring e definir cookies/credenciais, isolamento por usuário, consentimento e retenção. O frontend está preparado para HTTP; **não afirma integração real com PostgreSQL, Tess4J ou Gemini**.
 
-## Verificação e comparações
+## Verificação
 
-Foram executados instalação, lint, testes e build. A revisão do chatbot passou em 44 testes em quatro arquivos; ver [relatório do fluxo](CHAT_FLOW_NOTES.md). Os testes cobrem contadores/filtros, validação, upload e cancelamento, contexto/histórico por documento, perfil, multipart/202, timeout, erros/schema remoto e navegação. Resultados finais estão em [MIGRATION_NOTES.md](MIGRATION_NOTES.md).
-
-Chrome automatizado: cinco telas e contexto, nos viewports **390×844, 430×932 e 1280×800**, além dos fluxos de upload, preview, chat, contadores, perfil e logout. A referência foi o `frontend/src/dist/` já existente, servido **somente para leitura**, conferido contra o JSX inspecionado. Não foi feito novo build na pasta original. Capturas e relatórios locais ficam em `validation/`; PNGs são ignorados pelo Git para não adicionar megabytes ao código.
-
-Para repetir, em terminais separados, a partir desta pasta:
-
-```bash
-npm run dev
-node scripts/serve-original.mjs
-npm run test:browser
-```
-
-O script usa `/usr/bin/google-chrome`; sobrescreva com `CHROME_PATH=/caminho/do/chrome`. A referência precisa ter seu `dist/` pré-existente. As capturas usam página completa; o desktop mantém a coluna de 430 px.
-
-Para testar o modo API com respostas HTTP **exclusivamente interceptadas no teste**:
-
-```bash
-VITE_DATA_SOURCE=api npm run dev -- --port 5176
-# Em outro terminal:
-npm run test:browser:api
-```
-
-Isso cobre ausência de endpoints sem mocks, FormData, processamento assíncrono, erro/retry de chat e GET/PATCH de perfil. Não substitui testes contra o backend real.
+Os testes automatizados (`npm run test`, Vitest + Testing Library) cobrem contadores/filtros, validação, upload e cancelamento, contexto/histórico por documento, perfil, multipart/202, timeout, erros/schema remoto, navegação e o fluxo do chat. O modo API é testado com respostas HTTP interceptadas no próprio teste; isso não substitui testes contra o backend real.
 
 Checklist manual complementar:
 
@@ -137,17 +115,8 @@ A estética original foi mantida. Diferenças documentadas: indicador discreto d
 
 Pendências backend detalhadas em [API_CONTRACT_RASCUNHO.md](API_CONTRACT_RASCUNHO.md): upload/armazenamento, status assíncrono, OCR/legibilidade, classificação, resumo/valores estruturados, Gemini via Spring, histórico/chat por documento, perfil, exclusão, exportação e autenticação/autorização. Definir CORS, schemas, limites, política LGPD, isolamento por usuário e contrato para anexos. PostgreSQL permanece exclusivamente atrás do Spring Boot.
 
-Os documentos originais recebidos na subpasta duplicada `frontend-novo/` foram preservados; cópias na raiz desta aplicação facilitam a consulta.
-
 ## Restauração do chatbot demonstrativo
 
 A jornada de renda pertence exclusivamente ao modo mock. Selecionar uma alternativa exige confirmação; durante o envio, alternativas e composer ficam bloqueados. Falhas preservam o envio e permitem retry com o mesmo ID, sem duplicar a mensagem, resposta ou aviso. O mock também reconhece envios já concluídos quando a resposta se perde. “Outra opção” e “Prefiro não informar” não exigem divulgar renda. Etapa, seleção, histórico e rascunho ficam na memória, separados por serviço/sessão e `documentId`.
 
 A introdução revela mensagens em 0/600/1000/1400 ms; uploads têm processamento demonstrativo de 3,2 s e pausa inicial de 300 ms. A resposta de renda leva 1,8 s e o aviso aparece 800 ms depois. O modo API usa as mensagens efetivamente retornadas pelo servidor, sem acrescentar pergunta de renda, respostas fictícias ou aviso por detectar “R$” no texto. Idempotência de gravação no backend real ainda precisa de contrato próprio; a proteção atual do retry remoto evita duplicação na interface.
-
-```bash
-# Com a nova aplicação em 5174 e a referência original em 5175:
-npm run test:browser:chat
-```
-
-O script compara seleção de renda e resposta no Chrome nas três resoluções, valida digitação/chat livre/retorno e testa a jornada de upload. As capturas usam os mesmos arquivos locais Nunito; somente no navegador de teste, a requisição Google Fonts do original é interceptada para evitar instabilidade de rede. Nenhum arquivo original é alterado. Ver [CHAT_FLOW_NOTES.md](CHAT_FLOW_NOTES.md) para arquivos, validações e diferenças intencionais.
