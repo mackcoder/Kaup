@@ -2,6 +2,7 @@ package com.kaup.security;
 
 import java.io.IOException;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -21,6 +22,7 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.security.web.session.DisableEncodeUrlFilter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -47,14 +49,24 @@ public class SecurityConfig {
     }
 
     @Bean
+    public LimitePorIp limitePorIp(@Value("${kaup.limite.ip-por-minuto}") int porMinuto,
+                                   @Value("${kaup.limite.auth-por-minuto}") int authPorMinuto,
+                                   @Value("${kaup.limite.cadastros-por-hora}") int cadastrosPorHora) {
+        return new LimitePorIp(porMinuto, authPorMinuto, cadastrosPorHora);
+    }
+
+    @Bean
     public SecurityContextRepository securityContextRepository() {
         return new HttpSessionSecurityContextRepository();
     }
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, SecurityContextRepository contextos,
-                                           ObjectMapper json) throws Exception {
+                                           ObjectMapper json, LimitePorIp limitePorIp,
+                                           @Value("${kaup.limite.saltos-de-proxy}") int saltosDeProxy)
+            throws Exception {
         http
+            .addFilterBefore(new LimitePorIpFilter(limitePorIp, json, saltosDeProxy), DisableEncodeUrlFilter.class)
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
