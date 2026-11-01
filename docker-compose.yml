@@ -17,7 +17,10 @@ services:
   backend:
     build: ./backend
     container_name: app_backend
-    restart: always
+    restart: unless-stopped
+    # Teto de recursos: um PDF hostil ou uma rajada de OCR não derruba a máquina inteira.
+    mem_limit: 1g
+    cpus: 1.5
     ports:
       # Só a própria máquina alcança a API (o proxy do Vite usa localhost:8080).
       - "127.0.0.1:8080:8080"

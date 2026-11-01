@@ -216,7 +216,8 @@ public class GeminiService implements ServicoDeIA {
         try {
             return objectMapper.readTree(json);
         } catch (JsonProcessingException e) {
-            log.error("O Gemini devolveu um conteúdo que não é JSON válido: {}", json, e);
+            // Não loga o conteúdo: é a análise do contrato de alguém.
+            log.error("O Gemini devolveu um conteúdo que não é JSON válido ({} caracteres)", json.length(), e);
             throw new ServicoExternoException("IA (Gemini)", e);
         }
     }
@@ -242,7 +243,9 @@ public class GeminiService implements ServicoDeIA {
     private String extrairTexto(JsonNode resposta) {
         JsonNode parts = resposta == null ? null : resposta.path("candidates").path(0).path("content").path("parts");
         if (parts == null || !parts.isArray() || parts.isEmpty()) {
-            log.error("Resposta do Gemini sem conteúdo: {}", resposta);
+            // Só o motivo do corte (SAFETY, MAX_TOKENS...), nunca o corpo da resposta.
+            log.error("Resposta do Gemini sem conteúdo (finishReason={})",
+                    resposta == null ? null : resposta.path("candidates").path(0).path("finishReason").asText(null));
             throw new ServicoExternoException("IA (Gemini)", null);
         }
         StringBuilder sb = new StringBuilder();
