@@ -123,7 +123,7 @@ Checklist manual complementar:
 
 A estética original foi mantida. Diferenças documentadas: indicador discreto de dados fictícios; contadores corretos (4/5/6/4/6, total 25; status 15/6/4); análise e respostas explicitamente ilustrativas; contrato fictício de exemplo explicitamente identificado para upload; confirmação/preview/limites; opção de não informar renda; contexto alinhado à coluna no desktop; campos de perfil validados e modais com foco/Escape; erros HTTP visíveis. O chat usa altura dinâmica da viewport e rolagem interna para manter o composer acessível.
 
-Pendências que continuam abertas (ver `../PLANO_INTEGRACAO.md`): anexar contexto ao chat, narração e entrada por voz, exportação dos dados da pessoa, política de retenção (LGPD), limite de tentativas de login, CORS e HTTPS para publicação, e o processamento assíncrono do envio.
+Pendências que continuam abertas (ver `../docs/planejamento/PLANO_INTEGRACAO.md`): anexar contexto ao chat, narração e entrada por voz, exportação dos dados da pessoa, política de retenção (LGPD), limite de tentativas de login, CORS e HTTPS para publicação, e o processamento assíncrono do envio.
 
 ## Restauração do chatbot demonstrativo
 

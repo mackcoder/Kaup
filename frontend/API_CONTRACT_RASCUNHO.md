@@ -1,42 +1,84 @@
-# API_CONTRACT_RASCUNHO.md — Proposta de contrato frontend/backend Kaup
+# API_CONTRACT_RASCUNHO.md — Contrato frontend/backend do Kaup
 
-> **Documento de planejamento, NÃO é uma API já existente.** A equipe de backend precisa aprovar nomes, respostas, autenticação, tamanho de arquivo, políticas de armazenamento e como representar OCR/IA. **Não implemente automaticamente estes endpoints em `../backend/` durante a refatoração de `frontend-novo/`.**
+> **Contrato implementado e em uso** (atualizado em 2026-11-01). Fonte da verdade: os controllers em `backend/src/main/java/com/kaup/controller/` e os DTOs em `.../dto/`. O frontend os valida em `frontend/src/services/api/dto.ts`. Se um campo mudar, mudar nos dois lados.
+>
+> O nome do arquivo ficou de quando era uma proposta; ele continua com esse nome só para não quebrar referências.
 
-## 1. O que existe hoje
+## 1. Regras gerais
 
-`GET /api/analise/health` em `AnaliseController.java` devolve texto simples indicando que o backend iniciou. `OcrService`, `GeminiService` e `AnaliseRepository` estão declarados sem implementação funcional. O backend tem dependências Spring Boot, JPA/PostgreSQL e Tess4J, mas ainda não apresenta API de documentos/chat.
+- **Sessão por cookie** (`JSESSIONID`, HttpOnly, 7 dias, guardada no Postgres). Sem sessão, qualquer rota fora de `/api/auth/*` responde `401`.
+- **CSRF:** o backend entrega o cookie `XSRF-TOKEN`; o frontend o lê e o devolve no cabeçalho `X-XSRF-TOKEN` em todo `POST`, `PATCH` e `DELETE`. Isso exige que front e API fiquem no **mesmo domínio** (proxy do Vite em desenvolvimento, nginx no Docker).
+- **Dono dos dados:** cada pessoa só acessa os próprios documentos (outro id responde `404`). O papel `ADMIN` lê todos, mas só o dono altera (`ownedByMe`).
+- **IDs** são texto (UUID). O frontend rejeita número.
+- **Erros** seguem RFC 7807 (`ProblemDetail`): `{ "type", "title", "status", "detail" }`, com `detail` em português. Códigos usados: `400`, `401`, `403`, `404`, `409` (e-mail já cadastrado), `413`, `415`, `429` (muitas tentativas de login), `502/503` (Gemini fora do ar).
+- **Limites:** arquivo de até 10 MB; PDF, PNG ou JPEG; no máximo 5 anexos por documento.
 
-## 2. Proposta de endpoints REST (TODOS abaixo exceto health são futuros)
+## 2. Endpoints
 
-| Método | Endpoint proposto | Finalidade |
+### Autenticação (`/api/auth`) — públicos, exceto `sair` e `eu`
+| Método | Rota | Corpo | Resposta |
+|---|---|---|---|
+| `POST` | `/cadastro` | `{name, email, password, confirmPassword}` | `201` `UsuarioDTO` e já abre a sessão |
+| `POST` | `/entrar` | `{email, password}` | `200` `UsuarioDTO` (bloqueio temporário após várias falhas: `429`) |
+| `POST` | `/recuperar/solicitar` | `{email}` | `204`; não envia e-mail e responde igual para qualquer endereço |
+| `POST` | `/recuperar/redefinir` | `{email, code, password, confirmPassword}` | `204`. O código é fixo (`KAUP_CODIGO_FAKE`, decisão do projeto: sem e-mail real) |
+| `POST` | `/sair` | — | `204` |
+| `GET` | `/eu` | — | `200` `UsuarioDTO` |
+
+### Documentos (`/api/documentos`)
+| Método | Rota | Descrição |
 |---|---|---|
-| `GET` | `/api/analise/health` | Existente: health de aplicação, **não** valida OCR/IA/DB |
-| `POST` | `/api/documentos` | Upload `multipart/form-data`, campo `file`, metadados opcionais; retorna ID e status |
-| `GET` | `/api/documentos` | Lista por usuário autenticado; suporta filtros/paginação quando acordado |
-| `GET` | `/api/documentos/{id}` | Metadados/status de um documento |
-| `GET` | `/api/documentos/{id}/analise` | Resultado OCR/síntese quando disponível |
-| `POST` | `/api/documentos/{id}/chat/mensagens` | Enviar pergunta e receber resposta contextualizada |
-| `GET` | `/api/documentos/{id}/chat/mensagens` | Histórico, se persistência autorizada |
-| `GET` | `/api/perfil` | Dados e preferências do perfil autenticado |
-| `PATCH` | `/api/perfil` | Atualiza preferências e campos permitidos |
-| `DELETE` | `/api/documentos/{id}` | Exclusão conforme política definida |
+| `POST` | `/` | `multipart/form-data`: `file` (obrigatório) e `categoryId` (opcional). **Síncrono:** faz OCR, categoriza e analisa antes de responder (`201` `DocumentoDTO`, já `completed`). Pode levar dezenas de segundos. |
+| `GET` | `/` | Lista os documentos da pessoa (o ADMIN vê todos). |
+| `GET` | `/{id}` | Um documento. |
+| `GET` | `/{id}/analise` | `AnaliseDTO`. |
+| `DELETE` | `/{id}` | `204`. Só o dono. Apaga também conversa e anexos. |
 
-**A implementação frontend em modo `api` deve usar um único arquivo de configuração de endpoints/serviços**; caminhos podem ser alterados depois que a equipe definir o contrato real. A resposta HTTP da aplicação pode incluir `202 Accepted` para processamento assíncrono; o frontend não deve supor análise instantânea.
+### Chat (`/api/documentos/{id}/chat/mensagens`)
+| Método | Descrição |
+|---|---|
+| `GET` | Histórico, do mais antigo ao mais novo. |
+| `POST` | Corpo `{message}`. Devolve a resposta da IA (`MensagemChatDTO`, `role: "assistant"`). A pergunta e a resposta ficam gravadas. |
 
-## 3. Modelos exemplificativos (apenas proposta)
+### Anexos de contexto (`/api/documentos/{id}/contexto`)
+| Método | Descrição |
+|---|---|
+| `GET` | Lista os anexos (`AnexoDTO`). |
+| `POST` | `multipart/form-data` com `file` (PDF, PNG ou JPEG). OCR e o texto passa a valer nas próximas respostas do chat. `201` `AnexoDTO`. |
+
+### Perfil e conta
+| Método | Rota | Descrição |
+|---|---|---|
+| `GET` | `/api/perfil` | `PerfilDTO`. |
+| `PATCH` | `/api/perfil` | Qualquer subconjunto de `name`, `email`, `fontSize`, `explainLevel`, `income`, `audio`, `shareIncomeWithAi`. Valores fora das listas permitidas dão `400`. |
+| `GET` | `/api/conta/exportar` | Baixa `kaup-meus-dados.json` com tudo o que o sistema guarda da pessoa. |
+| `DELETE` | `/api/conta` | `204`. Apaga a conta, os documentos e as conversas, e encerra a sessão. |
+
+### Depuração
+| Método | Rota | Observação |
+|---|---|---|
+| `GET` | `/api/analise/health` | Texto fixo; **não** prova que banco, OCR ou Gemini funcionam. |
+| `POST` | `/api/analise/contrato`, `/api/analise/texto` | **Removidas.** Davam acesso ao Gemini sem gravar nada; o envio de contratos é só por `POST /api/documentos`. |
+
+## 3. Modelos (formato real)
 
 ```ts
 type ProcessingStatus = "pending" | "processing" | "completed" | "failed";
 
-type DocumentDTO = {
+type UsuarioDTO = { id: string; name: string; email: string; role: "USER" | "ADMIN" };
+
+type DocumentoDTO = {
   id: string;
   name: string;
-  categoryId: string | null;
+  categoryId: string | null;     // Carros, Casa, Trabalho, Banco ou Outros
   processingStatus: ProcessingStatus;
-  createdAt: string; // ISO 8601
+  createdAt: string;             // ISO 8601
+  description: string | null;    // primeira frase do resumo
+  visualStatus: "ok" | "warning"; // "warning" = a IA listou pontos de atenção
+  ownedByMe: boolean;            // falso quando o ADMIN olha documento alheio
 };
 
-type AnalysisDTO = {
+type AnaliseDTO = {
   documentId: string;
   processingStatus: ProcessingStatus;
   summary: string | null;
@@ -44,68 +86,50 @@ type AnalysisDTO = {
     id: string;
     title: string;
     description: string;
-    severity: "info" | "warning" | "critical";
+    severity: "info" | "warning" | "critical"; // o backend hoje só produz info e warning
   }>;
-  ocrQualityWarning?: string | null;
+  ocrQualityWarning: string | null; // hoje sempre null (ainda não calculado)
 };
 
-type ChatRequestDTO = { message: string };
-
-type ChatReplyDTO = {
+type MensagemChatDTO = {
   id: string;
-  documentId: string;
-  role: "assistant";
+  documentId: string;            // igual ao da URL; o frontend recusa se divergir
+  role: "user" | "assistant";
   content: string;
   createdAt: string;
 };
 
-type ApiErrorDTO = {
-  code: string;
-  message: string;
-  requestId?: string;
+type AnexoDTO = { id: string; documentId: string; name: string; mimeType: string; createdAt: string };
+
+type PerfilDTO = {
+  name: string;
+  email: string;
+  fontSize: string;
+  explainLevel: string;
+  income: string;
+  audio: boolean;
+  shareIncomeWithAi: boolean; // falso = a renda nunca vai para a IA
+  retentionDays: number;      // 0 = nunca apagar
 };
 ```
 
-### Exemplos de payload (propostos)
+## 4. Decisões já tomadas
 
-```http
-POST /api/documentos
-Content-Type: multipart/form-data
+- Autenticação: conta própria (e-mail e senha) com sessão em cookie. Sem Google e **sem verificação de e-mail** nem e-mail real (projeto universitário, ver `CLAUDE.md`).
+- Formatos: PDF (digital ou escaneado), PNG e JPEG, até 10 MB; o tipo é conferido no servidor.
+- OCR e IA atrás da interface `ServicoDeIA` (Gemini hoje); o OCR é o Tesseract (Tess4J).
+- Persistência: texto extraído, análise, conversas e anexos ficam no Postgres; o arquivo original **não** é guardado. Retenção de 180 dias (`KAUP_RETENCAO_DIAS`).
+- Exportação e exclusão de dados da conta disponíveis (LGPD).
 
-file=<arquivo binário>
-```
+## 5. Ainda em aberto
 
-```json
-{
-  "id": "doc-123",
-  "name": "Contrato de aluguel.pdf",
-  "categoryId": null,
-  "processingStatus": "pending",
-  "createdAt": "2026-10-16T10:00:00Z"
-}
-```
+- **Upload assíncrono** (`202 Accepted` + consulta de status): ver `docs/planejamento/202.md`. Até lá o `POST /api/documentos` é síncrono.
+- `/api/v1/` não foi adotado; sem previsão.
+- Aviso de leitura ruim (`ocrQualityWarning`) e `severity: "critical"` ainda não são produzidos.
+- Anexo avulso e conversa não podem ser apagados separadamente do documento.
+- Cotas de uso e limite de requisições por IP (ver `docs/planejamento/SEGURANCA.md`), que adicionarão respostas `429` a mais rotas.
 
-```http
-POST /api/documentos/doc-123/chat/mensagens
-Content-Type: application/json
+## 6. Regras de integração
 
-{"message":"Qual é a multa por rescisão?"}
-```
-
-## 4. Questões que precisam ser decididas com o backend
-
-1. **Autenticação e autorização:** login próprio, provedor externo, cookie HttpOnly ou bearer; garantir isolamento de documentos por usuário e acesso a cada `documentId`. Sem isso, não afirmar que há privacidade real.
-2. **Formato de arquivo:** PDF digital, PDF escaneado, PNG/JPEG e tamanhos máximos; validação de MIME, tipo real e limites no servidor.
-3. **Processamento assíncrono:** usar polling de status, notificações ou SSE; códigos HTTP; limites de timeout e retry.
-4. **OCR/IA:** interface de entrada/saída, avisos de baixa legibilidade, classificação, resumo, explicação simples, referência a cláusulas e indicadores de incerteza.
-5. **Dados pessoais/LGPD:** consentimento, retenção, anonimização antes de APIs externas, exclusão, segurança em trânsito e repouso e logs.
-6. **Persistência:** entidades JPA, política para guardar arquivos originais, extração OCR, análises e conversas. Armazenamento binário não deve ser projetado no frontend.
-7. **Configuração CORS e origem:** preferir proxy Vite no desenvolvimento; em produção, URLs/origens confiáveis e HTTPS.
-8. **Contrato de erros:** esquema de resposta, `401`, `403`, `404`, `413`, `415`, `422`, `429`, `500`, `503`; mensagens úteis e não sensíveis.
-9. **Versionamento:** considerar `/api/v1/` antes da primeira integração real se a equipe achar necessário.
-
-## 5. Estratégia de integração
-
-- **Agora:** o frontend utiliza adapters mock para a demonstração completa. O adapter API existe com métodos tipados, validação de estado e mensagens claras quando endpoint real estiver ausente.
-- **Primeira integração recomendada:** upload -> ID -> status -> resumo; depois listagem persistida, chat contextualizado, perfil/autenticação.
-- **Nunca:** acessar PostgreSQL a partir de código React, enviar `GEMINI_API_KEY` para browser, criar respostas fake em modo `api` após erro, ou tratar health como prova de que a análise está funcionando.
+- O frontend usa um único arquivo de serviços (`frontend/src/services/api/`); em modo `api` **nunca** mostra dados fictícios após um erro.
+- **Nunca:** acessar o PostgreSQL pelo React, enviar `GEMINI_API_KEY` ao navegador, ou tratar `/health` como prova de que a análise funciona.
