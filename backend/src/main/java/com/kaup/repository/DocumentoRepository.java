@@ -16,6 +16,9 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
 
     List<Documento> findAllByOrderByCriadoEmDesc();
 
+    /** Quantos documentos foram criados a partir de {@code instante} (conta o uso diário da IA). */
+    long countByCriadoEmGreaterThanEqual(Instant instante);
+
     /** Documentos de uma pessoa, do mais recente para o mais antigo. */
     List<Documento> findByDonoIdOrderByCriadoEmDesc(UUID donoId);
 

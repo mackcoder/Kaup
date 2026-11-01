@@ -36,6 +36,13 @@ public class ApiExceptionHandler {
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
+    @ExceptionHandler(LimiteDiarioException.class)
+    public ResponseEntity<ProblemDetail> limiteDiario(LimiteDiarioException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, String.valueOf(e.getSegundos()))
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
+    }
+
     @ExceptionHandler(OperacaoNaoPermitidaException.class)
     public ProblemDetail naoPermitido(OperacaoNaoPermitidaException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());

@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,6 +48,7 @@ class ChatServiceTest {
     private UsuarioRepository usuarios;
     private ServicoDeIA servicoDeIA;
     private AnexoContextoRepository anexos;
+    private TetoDiarioGemini teto;
     private ChatService service;
     private Documento documento;
     private final UsuarioLogado usuario = new UsuarioLogado(UUID.randomUUID(), "ana@exemplo.com", Papel.USER, null);
@@ -58,7 +60,8 @@ class ChatServiceTest {
         usuarios = mock(UsuarioRepository.class);
         servicoDeIA = mock(ServicoDeIA.class);
         anexos = mock(AnexoContextoRepository.class);
-        service = new ChatService(documentoService, repository, usuarios, servicoDeIA, anexos);
+        teto = mock(TetoDiarioGemini.class);
+        service = new ChatService(documentoService, repository, usuarios, servicoDeIA, anexos, teto);
 
         documento = new Documento();
         ReflectionTestUtils.setField(documento, "id", documentoId);
@@ -319,5 +322,16 @@ class ChatServiceTest {
         verify(servicoDeIA).conversar(
                 "texto do contrato\n\n=== ANEXO: aditivo.pdf ===\nmulta passa a 5%",
                 List.of(), "Qual é a multa?", PreferenciasDeIA.PADRAO);
+    }
+
+    @Test
+    void comOTetoDiarioEstouradoNaoChamaAIANemGrava() {
+        doThrow(new com.kaup.exception.LimiteDiarioException(60)).when(teto).verificar();
+
+        assertThrows(com.kaup.exception.LimiteDiarioException.class,
+                () -> service.perguntar(documentoId.toString(), "Qual é a multa?", usuario));
+
+        verifyNoInteractions(servicoDeIA);
+        verify(repository, never()).saveAll(any());
     }
 }

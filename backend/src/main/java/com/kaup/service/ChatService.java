@@ -33,15 +33,17 @@ public class ChatService {
     private final UsuarioRepository usuarios;
     private final ServicoDeIA servicoDeIA;
     private final AnexoContextoRepository anexos;
+    private final TetoDiarioGemini teto;
 
     public ChatService(DocumentoService documentoService, MensagemChatRepository repository,
                        UsuarioRepository usuarios, ServicoDeIA servicoDeIA,
-                       AnexoContextoRepository anexos) {
+                       AnexoContextoRepository anexos, TetoDiarioGemini teto) {
         this.documentoService = documentoService;
         this.repository = repository;
         this.anexos = anexos;
         this.usuarios = usuarios;
         this.servicoDeIA = servicoDeIA;
+        this.teto = teto;
     }
 
     /**
@@ -54,6 +56,7 @@ public class ChatService {
     public MensagemChatResponse perguntar(String documentoId, String pergunta, UsuarioLogado usuario) {
         String texto = validar(pergunta);
         Documento documento = documentoService.obterDoDono(documentoId, usuario); // 404 se não é seu
+        teto.verificar();
 
         // Perfil lido a cada pergunta: mudar o nível de explicação ou bloquear a renda vale já na próxima.
         PreferenciasDeIA preferencias = usuarios.findById(usuario.id())

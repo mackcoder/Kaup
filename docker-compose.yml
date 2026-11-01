@@ -37,6 +37,8 @@ services:
       - KAUP_CODIGO_FAKE=${KAUP_CODIGO_FAKE-676869}
       # Dias até os documentos (e conversas) dos usuários serem apagados. 0 desliga.
       - KAUP_RETENCAO_DIAS=${KAUP_RETENCAO_DIAS:-180}
+      # Teto global por dia de chamadas ao Gemini (análises + perguntas, de todos). 0 desliga.
+      - KAUP_TETO_DIARIO_GEMINI=${KAUP_TETO_DIARIO_GEMINI:-500}
       # Limite de requisições por IP (0 desliga) e quantos proxies confiáveis há na frente (X-Forwarded-For).
       - KAUP_LIMITE_IP_POR_MINUTO=${KAUP_LIMITE_IP_POR_MINUTO:-60}
       - KAUP_LIMITE_AUTH_POR_MINUTO=${KAUP_LIMITE_AUTH_POR_MINUTO:-10}

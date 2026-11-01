@@ -40,15 +40,17 @@ public class DocumentoService {
     private final DocumentoRepository repository;
     private final UsuarioRepository usuarios;
     private final ObjectMapper objectMapper;
+    private final TetoDiarioGemini teto;
 
     public DocumentoService(AnaliseService analiseService, ServicoDeIA servicoDeIA,
                             DocumentoRepository repository, UsuarioRepository usuarios,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper, TetoDiarioGemini teto) {
         this.analiseService = analiseService;
         this.servicoDeIA = servicoDeIA;
         this.repository = repository;
         this.usuarios = usuarios;
         this.objectMapper = objectMapper;
+        this.teto = teto;
     }
 
     /**
@@ -59,6 +61,7 @@ public class DocumentoService {
     public DocumentoResponse criar(MultipartFile arquivo, String categoryId, UsuarioLogado usuario)
             throws IOException {
         String categoria = normalizarCategoria(categoryId); // falha cedo, antes do OCR e da IA
+        teto.verificar(); // antes do OCR: com o teto estourado, nem gasta processamento
         PreferenciasDeIA preferencias = preferenciasDe(usuario);
         AnaliseContratoResponse resultado = analiseService.analisarArquivo(arquivo, preferencias);
         if (categoria == null) {

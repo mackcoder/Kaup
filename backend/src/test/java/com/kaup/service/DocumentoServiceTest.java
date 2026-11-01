@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -47,6 +48,7 @@ class DocumentoServiceTest {
     private UsuarioRepository usuarios;
     private final UsuarioLogado usuario = new UsuarioLogado(UUID.randomUUID(), "ana@exemplo.com", Papel.USER, null);
     private final UsuarioLogado admin = new UsuarioLogado(UUID.randomUUID(), "admin@admin", Papel.ADMIN, null);
+    private TetoDiarioGemini teto;
     private DocumentoService service;
 
     @BeforeEach
@@ -55,7 +57,8 @@ class DocumentoServiceTest {
         servicoDeIA = mock(ServicoDeIA.class);
         repository = mock(DocumentoRepository.class);
         usuarios = mock(UsuarioRepository.class);
-        service = new DocumentoService(analiseService, servicoDeIA, repository, usuarios, mapper);
+        teto = mock(TetoDiarioGemini.class);
+        service = new DocumentoService(analiseService, servicoDeIA, repository, usuarios, mapper, teto);
         // Simula o banco: save devolve a mesma entidade, já com id.
         when(repository.save(any(Documento.class))).thenAnswer(invocacao -> {
             Documento documento = invocacao.getArgument(0);
@@ -345,5 +348,16 @@ class DocumentoServiceTest {
         assertTrue(service.buscar(meu.getId().toString(), usuario).ownedByMe());
         // O administrador lê o documento de outra pessoa, mas não é o dono dele.
         assertFalse(service.buscar(alheio.getId().toString(), admin).ownedByMe());
+    }
+
+    @Test
+    void comOTetoDiarioEstouradoNaoFazOcrNemIANemGrava() throws Exception {
+        doThrow(new com.kaup.exception.LimiteDiarioException(60)).when(teto).verificar();
+        MockMultipartFile contrato = new MockMultipartFile("file", "c.pdf", "application/pdf", "x".getBytes());
+
+        assertThrows(com.kaup.exception.LimiteDiarioException.class, () -> service.criar(contrato, null, usuario));
+
+        verifyNoInteractions(analiseService, servicoDeIA);
+        verify(repository, never()).save(any());
     }
 }
