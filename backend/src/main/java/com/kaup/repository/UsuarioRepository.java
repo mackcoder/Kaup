@@ -1,5 +1,6 @@
 package com.kaup.repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -16,4 +17,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, UUID> {
     boolean existsByEmail(String email);
 
     long countByPapel(Papel papel);
+
+    List<Usuario> findByPapel(Papel papel);
 }
