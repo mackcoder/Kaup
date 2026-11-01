@@ -1,5 +1,6 @@
 package com.kaup.controller;
 
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -41,18 +42,15 @@ class AnaliseControllerTest {
     }
 
     @Test
-    void textoVazioRetorna400() throws Exception {
+    void rotasDeDepuracaoForamRemovidas() throws Exception {
         mockMvc.perform(post("/api/analise/texto").with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"texto\":\"\"}"))
-            .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void formatoNaoSuportadoRetorna400() throws Exception {
+                .content("{\"texto\":\"qualquer coisa\"}"))
+            .andExpect(status().is4xxClientError());
         MockMultipartFile arquivo = new MockMultipartFile(
-                "arquivo", "contrato.txt", "text/plain", "conteudo".getBytes());
+                "arquivo", "contrato.png", "image/png", "conteudo".getBytes());
         mockMvc.perform(multipart("/api/analise/contrato").file(arquivo).with(csrf()))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().is4xxClientError());
+        verifyNoInteractions(servicoDeIA);
     }
 }

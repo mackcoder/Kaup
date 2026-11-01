@@ -42,14 +42,6 @@ public class AnaliseService {
         return texto;
     }
 
-    /** Mesmo fluxo a partir de texto já extraído (pula o OCR). */
-    public AnaliseContratoResponse analisarTexto(String texto, PreferenciasDeIA preferencias) {
-        if (texto == null || texto.isBlank()) {
-            throw new ContratoInvalidoException("O campo 'texto' é obrigatório.");
-        }
-        return new AnaliseContratoResponse(texto, servicoDeIA.interpretar(texto, preferencias));
-    }
-
     private void validar(MultipartFile arquivo) {
         if (arquivo.isEmpty()) {
             throw new ContratoInvalidoException("Nenhum arquivo foi enviado.");

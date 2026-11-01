@@ -143,15 +143,6 @@ jobs:
           echo "HTTP $code"
           test "$code" = "404"
 
-      - name: Texto vazio deve retornar 400
-        run: |
-          J=/tmp/jar-ci.txt
-          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
-          code=$(curl -s -b $J -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/analise/texto \
-            -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" -d '{"texto":""}')
-          echo "HTTP $code"
-          test "$code" = "400"
-
       - name: OCR local deve ler uma imagem
         run: |
           pip install --quiet pillow
@@ -168,8 +159,8 @@ jobs:
           TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
           # Sem chave do Gemini, a resposta esperada e 502 "IA (Gemini)":
           # isso prova que o OCR local passou e so a etapa da IA falhou.
-          curl -s -b $J -X POST http://localhost:8080/api/analise/contrato -H "X-XSRF-TOKEN: $TOKEN" \
-            -F "arquivo=@contrato.png;type=image/png" | tee resposta.json
+          curl -s -b $J -X POST http://localhost:8080/api/documentos -H "X-XSRF-TOKEN: $TOKEN" \
+            -F "file=@contrato.png;type=image/png" | tee resposta.json
           echo
           grep -q "Gemini" resposta.json
 
