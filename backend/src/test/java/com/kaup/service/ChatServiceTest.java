@@ -299,6 +299,7 @@ class ChatServiceTest {
         perfilComRenda(false);
         service.perguntar(documentoId.toString(), "oi de novo", usuario);
 
+        @SuppressWarnings("unchecked")
         ArgumentCaptor<List<MensagemChat>> gravadas = ArgumentCaptor.forClass(List.class);
         verify(repository, org.mockito.Mockito.times(2)).saveAll(gravadas.capture());
         assertTrue(gravadas.getAllValues().get(0).get(1).usouRenda());

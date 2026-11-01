@@ -26,7 +26,7 @@ import com.kaup.exception.OperacaoNaoPermitidaException;
 import com.kaup.repository.UsuarioRepository;
 import com.kaup.security.LimiteDeTentativas;
 
-@SuppressWarnings({"unchecked", "rawtypes"})
+@SuppressWarnings({"rawtypes"})
 class RecuperacaoDeSenhaServiceTest {
 
     private UsuarioRepository repository;

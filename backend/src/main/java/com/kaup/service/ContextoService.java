@@ -24,6 +24,7 @@ public class ContextoService {
     /** Limite de texto de um anexo (caracteres); o excedente é cortado para não estourar o prompt. */
     static final int TEXTO_MAX_POR_ANEXO = 30_000;
 
+    @SuppressWarnings("unused")
     private static final int TAMANHO_MAX_NOME = 255;
 
     private final DocumentoService documentoService;
