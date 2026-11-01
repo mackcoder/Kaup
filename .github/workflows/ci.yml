@@ -58,7 +58,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Subir Postgres e backend
-        run: docker compose up -d --build postgres backend
+        run: |
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" > .env
+          docker compose up -d --build postgres backend
 
       - name: Esperar o backend responder
         run: |

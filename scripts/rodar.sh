@@ -17,6 +17,7 @@ docker info >/dev/null 2>&1 || erro "O Docker não está rodando. Linux: sudo sy
 command -v npm >/dev/null || erro "Node/npm não está instalado (veja RODAR.md, 'Instalar do zero')."
 [ -f .env ] || erro "Falta o arquivo .env. Rode: cp .env.example .env e preencha GEMINI_API_KEY."
 grep -Eq '^GEMINI_API_KEY=.+' .env || erro "GEMINI_API_KEY está vazia no .env."
+grep -Eq '^POSTGRES_PASSWORD=.+' .env || erro "POSTGRES_PASSWORD está vazia no .env. Gere uma: openssl rand -base64 24 (veja o .env.example)."
 
 # A porta 8080 precisa ser do nosso backend (outro projeto pode estar usando).
 if porta_em_uso 8080 && ! docker ps --format '{{.Names}}' | grep -qx app_backend; then

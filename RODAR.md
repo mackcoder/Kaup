@@ -100,7 +100,7 @@ Na raiz do repositório:
 cp .env.example .env
 ```
 
-Abra o `.env` e preencha `GEMINI_API_KEY=` com a sua chave. O arquivo é ignorado pelo git. Opcionais (já têm padrão): `GEMINI_MODEL`, `KAUP_ADMIN_*`, `KAUP_CODIGO_FAKE`, `KAUP_RETENCAO_DIAS` (comentados no próprio arquivo).
+Abra o `.env` e preencha `GEMINI_API_KEY=` com a sua chave e `POSTGRES_PASSWORD=` com uma senha longa (`openssl rand -base64 24`). O arquivo é ignorado pelo git. Opcionais (já têm padrão): `GEMINI_MODEL`, `KAUP_ADMIN_*`, `KAUP_CODIGO_FAKE`, `KAUP_RETENCAO_DIAS` (comentados no próprio arquivo).
 
 ### 6. Configurar e instalar o frontend
 
@@ -137,6 +137,7 @@ Na primeira vez o Docker baixa imagens e compila o backend (alguns minutos). No 
 |---|---|
 | `permission denied` ao usar docker | Passo 2: `usermod -aG docker` e entrar de novo na sessão. |
 | `The Docker daemon isn't running` | Linux: `sudo systemctl start docker`. Mac/Windows: abra o Docker Desktop. |
+| `Defina POSTGRES_PASSWORD no .env` | Preencha `POSTGRES_PASSWORD` no `.env`. Se o banco já existia, use a senha antiga (`senha_segura`) ou troque-a (ver `.env.example`). |
 | Porta 8080 em uso | Outro programa/container a usa. Veja: `docker ps` (Linux: `ss -ltnp 'sport = :8080'`; Mac: `lsof -iTCP:8080 -sTCP:LISTEN`); pare o outro. |
 | Porta 5174 em uso | Outro `npm run dev` aberto. Rode `scripts/parar.sh` ou feche o outro terminal. |
 | Tela diz "Não foi possível falar com o servidor" | O backend está desligado: `docker compose up -d postgres backend` e espere o `curl .../health` dar 200. |

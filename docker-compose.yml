@@ -5,10 +5,11 @@ services:
     restart: always
     environment:
       POSTGRES_USER: usuario_app
-      POSTGRES_PASSWORD: senha_segura
+      # Sem valor aqui de propósito: a senha vem do .env (gere com: openssl rand -base64 24).
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
       POSTGRES_DB: gestao_contratos
-    ports:
-      - "5432:5432"
+    # Sem "ports": o banco só é acessível pelo backend, pela rede interna do Docker.
+    # Para abrir no seu PC: "127.0.0.1:5432:5432". O Docker ignora o UFW nas portas publicadas.
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/config/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -18,9 +19,12 @@ services:
     container_name: app_backend
     restart: always
     ports:
-      - "8080:8080"
+      # Só a própria máquina alcança a API (o proxy do Vite usa localhost:8080).
+      - "127.0.0.1:8080:8080"
     environment:
-      - DATABASE_URL=postgres://usuario_app:senha_segura@postgres:5432/gestao_contratos
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/gestao_contratos
+      - SPRING_DATASOURCE_USERNAME=usuario_app
+      - SPRING_DATASOURCE_PASSWORD=${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - GEMINI_MODEL=${GEMINI_MODEL:-gemini-3.5-flash-lite}
       # Conta de administrador (vê todos os documentos). Os padrões servem só para desenvolvimento:
