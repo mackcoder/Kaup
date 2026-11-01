@@ -1,4 +1,5 @@
-backend/target/
 .vscode/
+backend/target/
 
+docs/planejamento/
 .env
