@@ -28,7 +28,7 @@
 ### Documentos (`/api/documentos`)
 | Método | Rota | Descrição |
 |---|---|---|
-| `POST` | `/` | `multipart/form-data`: `file` (obrigatório) e `categoryId` (opcional). **Síncrono:** faz OCR, categoriza e analisa antes de responder (`201` `DocumentoDTO`, já `completed`). Pode levar dezenas de segundos. |
+| `POST` | `/` | `multipart/form-data`: `file` (obrigatório) e `categoryId` (opcional); cabeçalho opcional `Idempotency-Key` (UUID por arquivo escolhido). **Assíncrono:** valida o arquivo e responde `202` com `DocumentoDTO` em `pending` e `Location`; OCR, categoria e análise rodam em segundo plano (`pending` → `processing` → `completed` ou `failed`). Reenvio com a mesma chave devolve o mesmo documento. Fila cheia: `429` com `Retry-After`. |
 | `GET` | `/` | Lista os documentos da pessoa (o ADMIN vê todos). |
 | `GET` | `/{id}` | Um documento. |
 | `GET` | `/{id}/analise` | `AnaliseDTO`. |
@@ -74,7 +74,8 @@ type DocumentoDTO = {
   processingStatus: ProcessingStatus;
   createdAt: string;             // ISO 8601
   description: string | null;    // primeira frase do resumo
-  visualStatus: "ok" | "warning"; // "warning" = a IA listou pontos de atenção
+  visualStatus: "ok" | "warning" | "pending"; // "warning" = a IA listou pontos de atenção; "pending" = ainda não lido
+  failureReason: string | null;  // motivo, em português, quando processingStatus = "failed"
   ownedByMe: boolean;            // falso quando o ADMIN olha documento alheio
 };
 
@@ -123,7 +124,6 @@ type PerfilDTO = {
 
 ## 5. Ainda em aberto
 
-- **Upload assíncrono** (`202 Accepted` + consulta de status): ver `docs/planejamento/202.md`. Até lá o `POST /api/documentos` é síncrono.
 - `/api/v1/` não foi adotado; sem previsão.
 - Aviso de leitura ruim (`ocrQualityWarning`) e `severity: "critical"` ainda não são produzidos.
 - Anexo avulso e conversa não podem ser apagados separadamente do documento.
