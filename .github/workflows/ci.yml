@@ -60,6 +60,14 @@ jobs:
       - name: Subir Postgres e backend
         run: |
           echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" > .env
+          # Os passos abaixo fazem dezenas de chamadas seguidas do mesmo IP; com os limites padrao
+          # (feitos para a demonstracao) o resultado dependeria da velocidade do runner. O filtro de
+          # IP tem testes de unidade proprios.
+          {
+            echo "KAUP_LIMITE_IP_POR_MINUTO=10000"
+            echo "KAUP_LIMITE_AUTH_POR_MINUTO=10000"
+            echo "KAUP_LIMITE_CADASTROS_POR_HORA=10000"
+          } >> .env
           docker compose up -d --build postgres backend
 
       - name: Esperar o backend responder
