@@ -67,6 +67,21 @@ class ExportacaoServiceTest {
     }
 
     @Test
+    void documentoAindaNaoLidoOuFalhoSaiSemTextoNemAnaliseSemQuebrar() {
+        Documento pendente = documento(null);
+        pendente.setProcessingStatus("pending");
+        pendente.setTextoExtraido(null);
+        when(documentos.findByDonoIdOrderByCriadoEmDesc(anaId)).thenReturn(List.of(pendente));
+
+        ExportacaoResponse r = service.exportar(anaId);
+
+        assertEquals(1, r.documents().size());
+        assertEquals("pending", r.documents().get(0).processingStatus());
+        assertNull(r.documents().get(0).extractedText());
+        assertNull(r.documents().get(0).analysis());
+    }
+
+    @Test
     void exportaContaPreferenciasDocumentosAnaliseEConversa() {
         when(documentos.findByDonoIdOrderByCriadoEmDesc(anaId)).thenReturn(List.of(documento("{\"resumo\":\"Um resumo\"}")));
         MensagemChat pergunta = new MensagemChat();
