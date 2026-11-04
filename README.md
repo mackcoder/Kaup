@@ -73,8 +73,6 @@ scripts/rodar.sh                  # backend + PostgreSQL (Docker) + frontend, op
 scripts/parar.sh                  # stops everything (data is kept)
 ```
 
-Inside Claude Code the same two actions are the `/run_kaup` and `/stop_kaup` skills.
-
 Always start the backend before the frontend. Without it the app shows "Não foi possível falar com o servidor".
 
 **Accounts.** Create an account on the "Criar conta" screen (name, e-mail, password of 8+ characters and its confirmation). Each person only sees their own documents. A development administrator account is created on startup (`ADMIN@ADMIN` / `ADMIN`): it can **read** every document but cannot change other people's documents, and its account cannot be deleted. **Set `KAUP_ADMIN_PASSWORD` (or `KAUP_ADMIN_ENABLED=false`) before publishing the system.** The first regular user to sign up adopts any documents that existed before accounts were introduced.

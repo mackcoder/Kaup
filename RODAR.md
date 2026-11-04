@@ -21,8 +21,6 @@ scripts/rodar.sh      # liga tudo e abre http://localhost:5174 no navegador
 scripts/parar.sh      # desliga tudo (os dados do banco ficam salvos)
 ```
 
-Com o Claude Code, dentro do projeto: `/run_kaup` e `/stop_kaup` fazem o mesmo.
-
 | Serviço | Endereço |
 |---|---|
 | App (frontend) | http://localhost:5174 |

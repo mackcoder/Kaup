@@ -3,3 +3,4 @@ backend/target/
 
 docs/planejamento/
 .env
+.claude/
