@@ -202,6 +202,12 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
       ) : phase === "loading" ? (
         service.mode === "mock" ? (
           <LoadingScreen doc={doc} />
+        ) : analysis?.processingStatus === "pending" ||
+          analysis?.processingStatus === "processing" ? (
+          <ResourceState
+            loading
+            message="Estamos lendo seu contrato. Pode sair desta tela: o documento fica na sua lista e avisamos lá quando terminar."
+          />
         ) : (
           <ResourceState loading />
         )

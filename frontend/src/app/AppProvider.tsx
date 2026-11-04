@@ -20,6 +20,8 @@ import { createService, errorMessage } from "../services";
 import { clearChatSessions } from "../features/chat/session";
 import { CATEGORY_STYLES } from "../styles/categories";
 import { presentDocument } from "../styles/presenters";
+/** De quanto em quanto tempo a lista é atualizada enquanto há documento sendo lido. */
+const DOCUMENT_POLL_MS = 3000;
 const emptyProfile: UserProfile = {
   name: "",
   email: "",
@@ -149,6 +151,19 @@ export function AppProvider({
       setError(errorMessage(e));
     }
   }, [service]);
+  // Enquanto algum documento ainda está sendo lido pelo servidor, atualiza a lista a cada 3 s.
+  // Para sozinho quando tudo termina; com a aba escondida, pula a consulta.
+  const reading = docs.some(
+    (d) =>
+      d.processingStatus === "pending" || d.processingStatus === "processing",
+  );
+  useEffect(() => {
+    if (!reading || !userId) return;
+    const timer = setInterval(() => {
+      if (document.visibilityState !== "hidden") void refreshDocuments();
+    }, DOCUMENT_POLL_MS);
+    return () => clearInterval(timer);
+  }, [reading, userId, refreshDocuments]);
   const acceptDocument = useCallback(
     (d: KaupDocument) =>
       setDocs((old) => [...old.filter((v) => v.id !== d.id), d]),

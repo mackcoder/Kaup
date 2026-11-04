@@ -16,6 +16,7 @@ export interface DocumentDTO {
   createdAt: string;
   description?: string;
   visualStatus?: "ok" | "warning" | "pending";
+  failureReason?: string | null;
 }
 export interface ChatReplyDTO {
   id: string;
@@ -69,7 +70,16 @@ export function documentFromDTO(value: unknown): KaupDocument {
     processingStatus: state,
     createdAt,
     description:
-      typeof d.description === "string" ? d.description : "Documento enviado",
+      state === "failed" && typeof d.failureReason === "string"
+        ? d.failureReason
+        : state === "pending" || state === "processing"
+          ? "Lendo o contrato…"
+          : typeof d.description === "string"
+            ? d.description
+            : "Documento enviado",
+    ...(typeof d.failureReason === "string" && {
+      failureReason: d.failureReason,
+    }),
     emoji: "📄",
     // Ausente (versões antigas do backend): trata como do próprio usuário.
     ownedByMe: typeof d.ownedByMe === "boolean" ? d.ownedByMe : true,

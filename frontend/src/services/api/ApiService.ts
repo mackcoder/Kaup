@@ -88,12 +88,25 @@ export class ApiService implements KaupService {
   async getDocument(id: string, signal?: AbortSignal) {
     return documentFromDTO(await this.request(e.document(id), { signal }));
   }
-  async upload(file: File, categoryId: string | null, signal?: AbortSignal) {
+  async upload(
+    file: File,
+    categoryId: string | null,
+    signal?: AbortSignal,
+    idempotencyKey?: string,
+  ) {
     const body = new FormData();
     body.append("file", file);
     if (categoryId) body.append("categoryId", categoryId);
     return documentFromDTO(
-      await this.request(e.documents, { method: "POST", body, signal }),
+      await this.request(e.documents, {
+        method: "POST",
+        body,
+        signal,
+        // Sem o Content-Type: o navegador o define, com o boundary do multipart.
+        ...(idempotencyKey && {
+          headers: { "Idempotency-Key": idempotencyKey },
+        }),
+      }),
     );
   }
   async removeDocument(id: string, signal?: AbortSignal) {
@@ -140,10 +153,9 @@ export class ApiService implements KaupService {
   async attachContext(id: string, file: File, signal?: AbortSignal) {
     const body = new FormData();
     body.append("file", file);
-    const [anexo] = this.anexosDe(
-      id,
-      [await this.request(e.context(id), { method: "POST", body, signal })],
-    );
+    const [anexo] = this.anexosDe(id, [
+      await this.request(e.context(id), { method: "POST", body, signal }),
+    ]);
     return anexo;
   }
   // Os anexos de outro documento nunca entram na lista: o id da URL manda.

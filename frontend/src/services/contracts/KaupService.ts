@@ -33,10 +33,15 @@ export interface KaupService {
   deleteAccount(signal?: AbortSignal): Promise<void>;
   listDocuments(signal?: AbortSignal): Promise<KaupDocument[]>;
   getDocument(id: string, signal?: AbortSignal): Promise<KaupDocument>;
+  /**
+   * No modo API o servidor responde na hora com o documento "pending" e lê o arquivo em
+   * segundo plano. `idempotencyKey` (um UUID por arquivo escolhido) evita duplicar no reenvio.
+   */
   upload(
     file: File,
     categoryId: string | null,
     signal?: AbortSignal,
+    idempotencyKey?: string,
   ): Promise<KaupDocument>;
   removeDocument(id: string, signal?: AbortSignal): Promise<void>;
   getAnalysis(id: string, signal?: AbortSignal): Promise<DocumentAnalysis>;

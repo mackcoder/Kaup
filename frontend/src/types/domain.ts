@@ -20,6 +20,8 @@ export interface KaupDocument {
   uploaded?: boolean;
   /** Falso quando o administrador consulta o documento de outra pessoa (somente leitura). */
   ownedByMe?: boolean;
+  /** Motivo (em português) de o documento ter ficado em "failed". */
+  failureReason?: string;
 }
 export interface DocumentCategory {
   key: string;
