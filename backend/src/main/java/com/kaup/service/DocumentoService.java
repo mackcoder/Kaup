@@ -2,10 +2,15 @@ package com.kaup.service;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,7 +25,7 @@ import com.kaup.entity.Documento;
 import com.kaup.exception.ContratoInvalidoException;
 import com.kaup.exception.DocumentoNaoEncontradoException;
 import com.kaup.exception.OperacaoNaoPermitidaException;
-import com.kaup.exception.ServicoExternoException;
+import com.kaup.exception.FilaCheiaException;
 import com.kaup.repository.DocumentoRepository;
 import com.kaup.repository.UsuarioRepository;
 import com.kaup.security.UsuarioLogado;
@@ -31,22 +36,28 @@ public class DocumentoService {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentoService.class);
 
+    static final String STATUS_PENDENTE = "pending";
     static final String STATUS_CONCLUIDO = "completed";
+
+    private static final int TAMANHO_MAX_CHAVE = 64;
 
     private static final int TAMANHO_MAX_NOME = 255;
 
     private final AnaliseService analiseService;
-    private final ServicoDeIA servicoDeIA;
+    private final ProcessadorDeDocumento processador;
+    private final Executor executor;
     private final DocumentoRepository repository;
     private final UsuarioRepository usuarios;
     private final ObjectMapper objectMapper;
     private final TetoDiarioGemini teto;
 
-    public DocumentoService(AnaliseService analiseService, ServicoDeIA servicoDeIA,
+    public DocumentoService(AnaliseService analiseService, ProcessadorDeDocumento processador,
+                            @Qualifier("executorAnalise") Executor executor,
                             DocumentoRepository repository, UsuarioRepository usuarios,
                             ObjectMapper objectMapper, TetoDiarioGemini teto) {
         this.analiseService = analiseService;
-        this.servicoDeIA = servicoDeIA;
+        this.processador = processador;
+        this.executor = executor;
         this.repository = repository;
         this.usuarios = usuarios;
         this.objectMapper = objectMapper;
@@ -54,29 +65,65 @@ public class DocumentoService {
     }
 
     /**
-     * Analisa o arquivo (OCR + IA) e só então grava. Se o OCR ou a análise falharem, a exceção
-     * sobe e nada é salvo. Se o usuário não escolheu categoria, a IA classifica. Não é
-     * transacional de propósito: a análise leva segundos e não deve segurar uma conexão do banco.
+     * Valida o arquivo, grava o documento como "pending" e entrega a leitura (OCR + IA) ao executor
+     * de análise; devolve na hora, sem esperar. Os bytes ficam só na memória até a tarefa terminar.
+     * Se a fila está cheia, o documento recém-criado é apagado e a pessoa recebe 429. Com uma
+     * {@code chave} já usada por ela, devolve o documento que a chave criou em vez de criar outro.
+     * Não é transacional de propósito: nada aqui deve segurar uma conexão do banco.
      */
-    public DocumentoResponse criar(MultipartFile arquivo, String categoryId, UsuarioLogado usuario)
+    public DocumentoResponse criar(MultipartFile arquivo, String categoryId, String chave, UsuarioLogado usuario)
             throws IOException {
-        String categoria = normalizarCategoria(categoryId); // falha cedo, antes do OCR e da IA
-        teto.verificar(); // antes do OCR: com o teto estourado, nem gasta processamento
-        PreferenciasDeIA preferencias = preferenciasDe(usuario);
-        AnaliseContratoResponse resultado = analiseService.analisarArquivo(arquivo, preferencias);
-        if (categoria == null) {
-            categoria = classificar(resultado.textoExtraido());
+        String categoria = normalizarCategoria(categoryId); // falha cedo, antes de ler o arquivo
+        String chaveLimpa = normalizarChave(chave);
+        if (chaveLimpa != null) {
+            Optional<Documento> existente = repository.findByDonoIdAndChaveIdempotencia(usuario.id(), chaveLimpa);
+            if (existente.isPresent()) {
+                return paraDocumentoResponse(existente.get(), usuario);
+            }
         }
+        analiseService.validar(arquivo);
+        teto.verificar(); // com o teto estourado, nem gasta processamento
+        PreferenciasDeIA preferencias = preferenciasDe(usuario);
+        // Copia agora: o arquivo temporário da requisição pode sumir antes de a tarefa começar.
+        String nome = nomeSeguro(arquivo.getOriginalFilename(), "Documento");
+        ArquivoEmMemoria copia = new ArquivoEmMemoria(nome, arquivo.getContentType(), arquivo.getBytes());
 
         Documento documento = new Documento();
-        documento.setNome(nomeSeguro(arquivo.getOriginalFilename(), "Documento"));
+        documento.setNome(nome);
         documento.setMimeType(arquivo.getContentType());
         documento.setCategoryId(categoria);
-        documento.setProcessingStatus(STATUS_CONCLUIDO);
-        documento.setTextoExtraido(resultado.textoExtraido());
-        documento.setAnaliseJson(resultado.analise().toString());
+        documento.setProcessingStatus(STATUS_PENDENTE);
+        documento.setChaveIdempotencia(chaveLimpa);
         documento.setDono(usuarios.getReferenceById(usuario.id()));
-        return paraDocumentoResponse(repository.save(documento), usuario);
+        try {
+            documento = repository.save(documento);
+        } catch (DataIntegrityViolationException e) {
+            // Dois envios com a mesma chave ao mesmo tempo: vale o que chegou primeiro.
+            if (chaveLimpa == null) {
+                throw e;
+            }
+            return paraDocumentoResponse(
+                    repository.findByDonoIdAndChaveIdempotencia(usuario.id(), chaveLimpa).orElseThrow(() -> e),
+                    usuario);
+        }
+
+        UUID id = documento.getId();
+        try {
+            executor.execute(() -> processador.processar(id, copia, categoria, preferencias));
+        } catch (RejectedExecutionException e) {
+            repository.deleteById(id);
+            throw new FilaCheiaException();
+        }
+        // Recém-salvo, o documento ainda não traz o donoId (coluna só de leitura): o dono é quem enviou.
+        return paraDocumentoResponse(documento, true);
+    }
+
+    /** Garante que o documento já foi lido; antes disso não há texto nem análise para usar. */
+    void exigirConcluido(Documento documento) {
+        if (!STATUS_CONCLUIDO.equals(documento.getProcessingStatus())) {
+            throw new ContratoInvalidoException(
+                    "Este documento ainda não foi lido. Aguarde terminar para continuar.");
+        }
     }
 
     /** O administrador vê os documentos de todos; as demais pessoas, só os próprios. */
@@ -102,7 +149,7 @@ public class DocumentoService {
                 documento.getProcessingStatus(),
                 AnaliseMapper.resumo(analise),
                 AnaliseMapper.pontosChave(analise),
-                null);
+                documento.getFalha());
     }
 
     /** Apaga o documento; a conversa dele some junto, pela cascata do banco. Só o dono apaga. */
@@ -158,6 +205,10 @@ public class DocumentoService {
     }
 
     private DocumentoResponse paraDocumentoResponse(Documento documento, UsuarioLogado usuario) {
+        return paraDocumentoResponse(documento, ehDono(documento, usuario));
+    }
+
+    private DocumentoResponse paraDocumentoResponse(Documento documento, boolean doDono) {
         JsonNode analise = lerAnalise(documento);
         return new DocumentoResponse(
                 documento.getId().toString(),
@@ -166,12 +217,17 @@ public class DocumentoService {
                 documento.getProcessingStatus(),
                 documento.getCriadoEm(),
                 AnaliseMapper.descricao(analise),
-                AnaliseMapper.visualStatus(analise),
-                ehDono(documento, usuario));
+                STATUS_CONCLUIDO.equals(documento.getProcessingStatus())
+                        ? AnaliseMapper.visualStatus(analise) : STATUS_PENDENTE,
+                documento.getFalha(),
+                doDono);
     }
 
     // Um JSON ilegível no banco não deve derrubar a listagem inteira: trata como análise vazia.
     private JsonNode lerAnalise(Documento documento) {
+        if (documento.getAnaliseJson() == null) { // ainda não lido, ou a leitura falhou
+            return objectMapper.createObjectNode();
+        }
         try {
             return objectMapper.readTree(documento.getAnaliseJson());
         } catch (JsonProcessingException | IllegalArgumentException e) {
@@ -191,16 +247,15 @@ public class DocumentoService {
         return categoryId;
     }
 
-    // A classificação é um extra: se a IA falhar ou responder algo fora da lista, o documento
-    // continua válido e vai para "Outros", em vez de perder um upload que já foi analisado.
-    private String classificar(String texto) {
-        try {
-            String categoria = Categorias.normalizar(servicoDeIA.classificar(texto, Categorias.DESCRICOES));
-            return categoria != null ? categoria : Categorias.OUTROS;
-        } catch (ServicoExternoException e) {
-            log.warn("Não foi possível classificar o documento; usando '{}'", Categorias.OUTROS, e);
-            return Categorias.OUTROS;
+    private String normalizarChave(String chave) {
+        if (chave == null || chave.isBlank()) {
+            return null;
         }
+        String limpa = chave.trim();
+        if (limpa.length() > TAMANHO_MAX_CHAVE) {
+            throw new ContratoInvalidoException("Idempotency-Key inválida.");
+        }
+        return limpa;
     }
 
     // O nome vem do cliente: descarta caminhos (C:\pasta\arquivo.pdf, ../arquivo.pdf) e limita o tamanho.

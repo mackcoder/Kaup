@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,14 +35,21 @@ public class DocumentoController {
         this.documentoService = documentoService;
     }
 
-    /** Recebe o contrato, faz OCR e IA na mesma requisição e devolve o documento já salvo. */
+    /**
+     * Recebe o contrato e responde 202 na hora, com o documento "pending". O OCR e a IA rodam em
+     * segundo plano; o frontend consulta {@code GET /{id}} até "completed" ou "failed".
+     * {@code Idempotency-Key} (opcional) faz um reenvio devolver o documento já criado.
+     */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DocumentoResponse> criar(
             @RequestParam("file") MultipartFile arquivo,
             @RequestParam(value = "categoryId", required = false) String categoryId,
+            @RequestHeader(value = "Idempotency-Key", required = false) String chave,
             @AuthenticationPrincipal UsuarioLogado usuario) throws IOException {
-        DocumentoResponse documento = documentoService.criar(arquivo, categoryId, usuario);
-        return ResponseEntity.created(URI.create("/api/documentos/" + documento.id())).body(documento);
+        DocumentoResponse documento = documentoService.criar(arquivo, categoryId, chave, usuario);
+        return ResponseEntity.accepted()
+                .location(URI.create("/api/documentos/" + documento.id()))
+                .body(documento);
     }
 
     @GetMapping

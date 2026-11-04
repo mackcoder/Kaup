@@ -92,6 +92,17 @@ class ChatServiceTest {
     }
 
     @Test
+    void documentoAindaNaoLidoNaoRecebePerguntas() {
+        doThrow(new ContratoInvalidoException("ainda não foi lido")).when(documentoService).exigirConcluido(documento);
+
+        assertThrows(ContratoInvalidoException.class,
+                () -> service.perguntar(documentoId.toString(), "Qual é a multa?", usuario));
+
+        verifyNoInteractions(servicoDeIA);
+        verify(repository, never()).saveAll(anyList());
+    }
+
+    @Test
     @SuppressWarnings("unchecked") // o captor de List<...> é inevitavelmente genérico
     void respondeComOContratoEGravaPerguntaERespostaJuntas() {
         MensagemChatResponse resposta = service.perguntar(documentoId.toString(), "  Qual é a multa?  ", usuario);

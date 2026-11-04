@@ -56,6 +56,7 @@ public class ChatService {
     public MensagemChatResponse perguntar(String documentoId, String pergunta, UsuarioLogado usuario) {
         String texto = validar(pergunta);
         Documento documento = documentoService.obterDoDono(documentoId, usuario); // 404 se não é seu
+        documentoService.exigirConcluido(documento);
         teto.verificar();
 
         // Perfil lido a cada pergunta: mudar o nível de explicação ou bloquear a renda vale já na próxima.

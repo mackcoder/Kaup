@@ -45,6 +45,7 @@ public class ContextoService {
     public AnexoResponse anexar(String documentoId, MultipartFile arquivo, UsuarioLogado usuario)
             throws IOException {
         Documento documento = documentoService.obterDoDono(documentoId, usuario);
+        documentoService.exigirConcluido(documento);
         if (repository.countByDocumentoId(documento.getId()) >= ANEXOS_MAX) {
             throw new ContratoInvalidoException(
                     "Cada documento aceita até " + ANEXOS_MAX + " anexos. Exclua o documento ou envie um novo.");

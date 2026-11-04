@@ -10,7 +10,8 @@ import java.time.Instant;
  * @param categoryId       sempre presente na resposta; nulo quando não há categoria
  * @param processingStatus pending, processing, completed ou failed
  * @param description      primeira frase do resumo, ou nulo
- * @param visualStatus     "ok" ou "warning"
+ * @param visualStatus     "ok" ou "warning"; "pending" enquanto o documento ainda não foi lido
+ * @param failureReason    motivo (em português) de o documento ter ficado "failed", ou nulo
  * @param ownedByMe        falso quando quem consulta (o administrador) não é o dono: o frontend
  *                         esconde as ações que só o dono pode fazer
  */
@@ -22,4 +23,5 @@ public record DocumentoResponse(
         Instant createdAt,
         String description,
         String visualStatus,
+        String failureReason,
         boolean ownedByMe) { }

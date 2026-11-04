@@ -31,6 +31,7 @@ import com.kaup.dto.AnaliseResponse;
 import com.kaup.dto.AnaliseResponse.PontoChave;
 import com.kaup.dto.DocumentoResponse;
 import com.kaup.exception.ContratoInvalidoException;
+import com.kaup.exception.FilaCheiaException;
 import com.kaup.exception.OperacaoNaoPermitidaException;
 import com.kaup.security.WithUsuarioLogado;
 import com.kaup.security.WithUsuarioLogadoFactory;
@@ -51,7 +52,7 @@ class DocumentoControllerTest {
 
     private DocumentoResponse documento() {
         return new DocumentoResponse(ID, "contrato.pdf", null, "completed",
-                Instant.parse("2026-10-30T12:00:00Z"), "Contrato de aluguel.", "warning", true);
+                Instant.parse("2026-10-30T12:00:00Z"), "Contrato de aluguel.", "warning", null, true);
     }
 
     private MockMultipartFile arquivo() {
@@ -59,11 +60,11 @@ class DocumentoControllerTest {
     }
 
     @Test
-    void uploadRetorna201NoFormatoQueOFrontendValida() throws Exception {
-        when(documentoService.criar(any(), any(), any())).thenReturn(documento());
+    void uploadRetorna202NoFormatoQueOFrontendValida() throws Exception {
+        when(documentoService.criar(any(), any(), any(), any())).thenReturn(documento());
 
         mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()))
-                .andExpect(status().isCreated())
+                .andExpect(status().isAccepted())
                 .andExpect(header().string("Location", "/api/documentos/" + ID))
                 .andExpect(jsonPath("$.id").value(ID))
                 .andExpect(jsonPath("$", hasKey("categoryId"))) // o frontend exige a chave, mesmo nula
@@ -74,17 +75,37 @@ class DocumentoControllerTest {
 
     @Test
     void uploadRepassaACategoriaInformada() throws Exception {
-        when(documentoService.criar(any(), eq("Carros"), any())).thenReturn(documento());
+        when(documentoService.criar(any(), eq("Carros"), any(), any())).thenReturn(documento());
 
         mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()).param("categoryId", "Carros"))
-                .andExpect(status().isCreated());
+                .andExpect(status().isAccepted());
 
-        verify(documentoService).criar(any(), eq("Carros"), any());
+        verify(documentoService).criar(any(), eq("Carros"), any(), any());
+    }
+
+    @Test
+    void uploadRepassaOIdempotencyKey() throws Exception {
+        when(documentoService.criar(any(), any(), eq("chave-1"), any())).thenReturn(documento());
+
+        mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()).header("Idempotency-Key", "chave-1"))
+                .andExpect(status().isAccepted());
+
+        verify(documentoService).criar(any(), any(), eq("chave-1"), any());
+    }
+
+    @Test
+    void filaCheiaRetorna429ComRetryAfter() throws Exception {
+        when(documentoService.criar(any(), any(), any(), any())).thenThrow(new FilaCheiaException());
+
+        mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().string("Retry-After", "30"))
+                .andExpect(jsonPath("$.detail").value("Estamos processando muitos contratos, tente em instantes."));
     }
 
     @Test
     void contratoInvalidoRetorna400ComMensagemEmPortugues() throws Exception {
-        when(documentoService.criar(any(), any(), any()))
+        when(documentoService.criar(any(), any(), any(), any()))
                 .thenThrow(new ContratoInvalidoException("Formato não suportado. Envie PDF, PNG ou JPEG."));
 
         mockMvc.perform(multipart("/api/documentos").file(arquivo()).with(csrf()))

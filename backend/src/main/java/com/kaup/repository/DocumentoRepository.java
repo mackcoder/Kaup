@@ -2,12 +2,14 @@ package com.kaup.repository;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.kaup.entity.Documento;
 import com.kaup.entity.Usuario;
@@ -37,4 +39,37 @@ public interface DocumentoRepository extends JpaRepository<Documento, UUID> {
             where d.criadoEm < :limite
               and d.dono.id in (select u.id from Usuario u where u.papel = com.kaup.entity.Papel.USER)""")
     int apagarDeUsuariosAnterioresA(@Param("limite") Instant limite);
+
+    Optional<Documento> findByDonoIdAndChaveIdempotencia(UUID donoId, String chaveIdempotencia);
+
+    // As três atualizações abaixo são consultas, e não "findById + save", para a tarefa em segundo
+    // plano não recriar um documento que a pessoa apagou enquanto ele era lido: sem linha, devolvem 0.
+
+    @Transactional
+    @Modifying
+    @Query("update Documento d set d.processingStatus = 'processing' where d.id = :id")
+    int marcarProcessando(@Param("id") UUID id);
+
+    @Transactional
+    @Modifying
+    @Query("""
+            update Documento d
+            set d.processingStatus = 'completed', d.falha = null, d.categoryId = :categoria,
+                d.textoExtraido = :texto, d.analiseJson = :analise
+            where d.id = :id""")
+    int concluir(@Param("id") UUID id, @Param("categoria") String categoria,
+                 @Param("texto") String texto, @Param("analise") String analise);
+
+    @Transactional
+    @Modifying
+    @Query("update Documento d set d.processingStatus = 'failed', d.falha = :falha where d.id = :id")
+    int falhar(@Param("id") UUID id, @Param("falha") String falha);
+
+    /** Na subida: o que estava na fila ou sendo lido se perdeu com o reinício. Devolve quantos eram. */
+    @Transactional
+    @Modifying
+    @Query("""
+            update Documento d set d.processingStatus = 'failed', d.falha = :falha
+            where d.processingStatus in ('pending', 'processing')""")
+    int falharEmAndamento(@Param("falha") String falha);
 }

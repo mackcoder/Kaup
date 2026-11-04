@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,6 +67,17 @@ class ContextoServiceTest {
         assertEquals("multa passa a 5%", salvo.getValue().getTextoExtraido());
         assertEquals("9", resposta.id());
         assertEquals(documentoId.toString(), resposta.documentId());
+    }
+
+    @Test
+    void documentoAindaNaoLidoNaoRecebeAnexos() throws Exception {
+        doThrow(new ContratoInvalidoException("ainda não foi lido")).when(documentoService).exigirConcluido(any());
+
+        assertThrows(ContratoInvalidoException.class,
+                () -> service.anexar(documentoId.toString(), arquivo("aditivo.pdf"), usuario));
+
+        verify(analiseService, never()).extrairTexto(any());
+        verify(repository, never()).save(any());
     }
 
     @Test

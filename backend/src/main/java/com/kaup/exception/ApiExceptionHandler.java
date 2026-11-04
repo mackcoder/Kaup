@@ -43,6 +43,13 @@ public class ApiExceptionHandler {
                 .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
+    @ExceptionHandler(FilaCheiaException.class)
+    public ResponseEntity<ProblemDetail> filaCheia(FilaCheiaException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, "30")
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
+    }
+
     @ExceptionHandler(OperacaoNaoPermitidaException.class)
     public ProblemDetail naoPermitido(OperacaoNaoPermitidaException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());

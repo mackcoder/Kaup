@@ -15,12 +15,16 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 
 /**
  * Contrato enviado pelo usuário. Guarda só o texto extraído e a análise da IA;
  * o arquivo original não é armazenado.
  */
 @Entity
+// Reenviar com a mesma Idempotency-Key devolve o documento já criado (nulos não colidem no Postgres).
+@Table(uniqueConstraints = @UniqueConstraint(columnNames = {"dono_id", "chaveIdempotencia"}))
 public class Documento {
 
     @Id
@@ -34,7 +38,7 @@ public class Documento {
     /** Chave de categoria do frontend (Carros, Casa, Trabalho, Banco, Outros) ou nulo. */
     private String categoryId;
 
-    /** pending, processing, completed ou failed (hoje o fluxo é síncrono: sempre completed). */
+    /** pending, processing, completed ou failed. O envio responde na hora; a leitura roda em segundo plano. */
     private String processingStatus;
 
     /**
@@ -49,6 +53,14 @@ public class Documento {
     // A mesma coluna, só para leitura: dá o id do dono sem carregar (nem tocar no proxy de) Usuario.
     @Column(name = "dono_id", insertable = false, updatable = false)
     private UUID donoId;
+
+    /** Chave que o frontend gera ao escolher o arquivo, para um reenvio não duplicar o documento. */
+    @Column(length = 64)
+    private String chaveIdempotencia;
+
+    /** Motivo curto, em português, de o documento ter ficado em "failed". Nulo nos demais. */
+    @Column(length = 300)
+    private String falha;
 
     @Column(columnDefinition = "TEXT")
     private String textoExtraido;
@@ -71,6 +83,10 @@ public class Documento {
     public Usuario getDono() { return dono; }
     public void setDono(Usuario dono) { this.dono = dono; }
     public UUID getDonoId() { return donoId; }
+    public String getChaveIdempotencia() { return chaveIdempotencia; }
+    public void setChaveIdempotencia(String chaveIdempotencia) { this.chaveIdempotencia = chaveIdempotencia; }
+    public String getFalha() { return falha; }
+    public void setFalha(String falha) { this.falha = falha; }
     public String getTextoExtraido() { return textoExtraido; }
     public void setTextoExtraido(String textoExtraido) { this.textoExtraido = textoExtraido; }
     public String getAnaliseJson() { return analiseJson; }

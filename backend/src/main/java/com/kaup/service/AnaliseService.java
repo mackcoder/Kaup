@@ -42,7 +42,8 @@ public class AnaliseService {
         return texto;
     }
 
-    private void validar(MultipartFile arquivo) {
+    /** Recusa arquivo vazio ou de tipo não aceito (PDF, PNG, JPEG). */
+    public void validar(MultipartFile arquivo) {
         if (arquivo.isEmpty()) {
             throw new ContratoInvalidoException("Nenhum arquivo foi enviado.");
         }
