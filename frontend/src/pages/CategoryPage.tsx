@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { CategoryView, DocumentView } from "../types/domain";
-import { STATUS } from "../styles/status";
+import { STATUS, statusOf } from "../styles/status";
 import UploadDialog from "../components/UploadDialog";
 interface Props {
   cat: CategoryView;
@@ -95,7 +95,7 @@ export default function CategoryPage({ cat, onBack, onOpenDoc }: Props) {
         <div className="kaup-22">Documentos</div>
 
         {cat.docs.map((doc, idx) => {
-          const st = STATUS[doc.status];
+          const st = statusOf(doc);
           const isTapped = tapped === idx;
           return (
             <button

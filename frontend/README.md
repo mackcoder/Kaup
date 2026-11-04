@@ -1,13 +1,13 @@
 # Kaup — frontend refatorado
 
-Aplicação executável e independente em `frontend-novo/`, com as cinco telas do protótipo, aparência original, React 19, TypeScript estrito, Vite e React Router. O frontend e backend originais foram somente lidos.
+Aplicação com as cinco telas do protótipo, aparência original, React 19, TypeScript estrito, Vite e React Router.
 
 ## Executar
 
 Requer Node **22.12+** (validado com 22.23.3) e npm.
 
 ```bash
-cd frontend-novo
+cd frontend
 npm install
 npm run dev
 ```
@@ -65,7 +65,7 @@ src/
 
 Páginas não importam fixtures nem conhecem URLs HTTP. O provider recebe um serviço e projeta os documentos para os componentes visuais. Categorias têm configuração visual própria; domínio e DTOs não carregam cores. `original.css` reúne 256 regras estáticas deduplicadas do JSX original; os identificadores escopados `kaup-*` preservam as declarações originais. Estilos condicionais e escala do perfil permanecem dinâmicos. Tailwind 4 é usado para preservar o reset original; não há template novo.
 
-Estado sensível não é salvo em `localStorage`, logs ou analytics. Nenhuma chave de IA, acesso a PostgreSQL ou chamada Gemini existe no navegador. A etapa guiada usa estados `intro`, `waiting-income`, `responding-income` e `free-chat`, com metadados explícitos e IDs por envio; nunca deduz renda pelo texto ou por qualquer mensagem do usuário. Autenticação real não está implementada; a interface de serviços é o ponto para integrar o futuro cliente/provedor de sessão. As preferências persistem entre telas durante a sessão; a escala de fonte mantém o comportamento do original no perfil.
+Estado sensível não é salvo em `localStorage`, logs ou analytics. Nenhuma chave de IA, acesso a PostgreSQL ou chamada Gemini existe no navegador. A etapa guiada usa estados `intro`, `waiting-income`, `responding-income` e `free-chat`, com metadados explícitos e IDs por envio; nunca deduz renda pelo texto ou por qualquer mensagem do usuário. Em modo API a autenticação é real (ver a seção abaixo); no modo demonstração não há contas. As preferências persistem entre telas durante a sessão; a escala de fonte mantém o comportamento do original no perfil.
 
 ## Modo API e Spring Boot
 
@@ -74,54 +74,42 @@ cp .env.example .env
 # Edite .env:
 # VITE_DATA_SOURCE=api
 # VITE_API_BASE_URL=
+# VITE_API_TIMEOUT_MS=60000
 npm run dev
 ```
 
-Com URL vazia, `/api` usa o proxy Vite para `http://localhost:8080`. Alternativamente, configure `VITE_API_BASE_URL=http://localhost:8080` e libere a origem no CORS do backend. A URL é a **origem**, sem sufixo `/api`. Em produção, o proxy de desenvolvimento não existe: configure reverse proxy `/api` ou a origem explícita. `VITE_API_TIMEOUT_MS` controla o limite por requisição, padrão 20000 ms. Variáveis `VITE_*` entram no bundle: nunca incluir segredos nelas.
+Com URL vazia, `/api` usa o proxy Vite para `http://localhost:8080`, e os cookies de sessão seguem sozinhos (mesma origem). Com `VITE_API_BASE_URL=http://localhost:8080` o frontend envia os cookies com `credentials: "include"`, e o backend precisa liberar a origem no CORS (ainda não configurado). A URL é a **origem**, sem sufixo `/api`. Em produção o proxy de desenvolvimento não existe: configure um reverse proxy `/api` com HTTPS. `VITE_API_TIMEOUT_MS` limita cada requisição (o padrão de 20000 ms é curto para o envio de um contrato; use 60000). Variáveis `VITE_*` entram no bundle: nunca coloque segredos nelas.
 
-**Confirmado no código backend:** somente `GET /api/analise/health`, que retorna texto e não comprova funcionamento de OCR, IA ou banco. `health()` existe no adapter, separado dos fluxos de documentos.
+**Endpoints usados** (todos em `src/services/api/endpoints.ts`; formatos e validadores em `dto.ts` e `types/domain.ts`):
 
-**Preparados no frontend, ainda propostos no backend:**
-
-| Operação | Contrato proposto |
+| Operação | Endpoint |
 |---|---|
-| Listar/enviar documento | GET/POST `/api/documentos`; upload FormData com `file` e `categoryId` opcional |
-| Consultar/excluir documento | GET/DELETE `/api/documentos/{id}` |
-| Acompanhar análise | GET `/api/documentos/{id}/analise` |
-| Histórico e pergunta contextual | GET/POST `/api/documentos/{id}/chat/mensagens` |
-| Perfil e preferências | GET/PATCH `/api/perfil` |
+| Descobrir quem está logado | `GET /api/auth/eu` |
+| Criar conta (já entra) / entrar / sair | `POST /api/auth/cadastro`, `/entrar`, `/sair` |
+| Esqueci minha senha (simulado: sem e-mail, código fixo) | `POST /api/auth/recuperar/solicitar`, `/recuperar/redefinir` |
+| Apagar a conta (e documentos, conversas) | `DELETE /api/conta` |
+| Baixar meus dados (JSON) | `GET /api/conta/exportar` |
+| Listar / enviar documento | `GET` / `POST /api/documentos` (envio: FormData com `file` e `categoryId` opcional) |
+| Ver / excluir documento | `GET` / `DELETE /api/documentos/{id}` |
+| Análise do documento | `GET /api/documentos/{id}/analise` |
+| Histórico e pergunta ao chat | `GET` / `POST /api/documentos/{id}/chat/mensagens` |
+| Perfil e preferências | `GET` / `PATCH /api/perfil` (o PATCH leva só o que mudou) |
 
-Caminhos estão em `src/services/api/endpoints.ts`; formatos e validadores em `dto.ts` e `types/domain.ts`. GET de documentos retorna uma lista JSON; upload retorna um documento, inclusive com HTTP 202 e status `pending`/`processing`. A análise é consultada a cada 2,5 s enquanto estiver pendente; sair da tela aborta as consultas de carregamento. Um envio já confirmado pertence à sessão do documento e pode terminar em memória após a navegação, preservando a resposta no retorno. Há timeout por chamada e retry explícito em falhas. Status de processamento e status visual são separados; sem `visualStatus`, a UI mantém “Aguardando” e não presume aprovação.
+**Sessão e segurança.** Sem login só aparecem as telas de entrar e criar conta, e o endereço pedido é mantido (depois de entrar, a pessoa continua onde queria). A sessão é um cookie que o JavaScript não lê; o backend entrega um token CSRF no cookie `XSRF-TOKEN`, que o `http.ts` devolve no cabeçalho `X-XSRF-TOKEN` em toda requisição que altera dados. Um 401 fora das telas de login (sessão expirada) leva de volta para o login; falha de rede ao descobrir a sessão mostra o erro, não a tela de entrar. Ao entrar ou sair, documentos, perfil e conversas da pessoa anterior são descartados. O modo demonstração (mock) continua sem login.
 
-A API valida respostas recebidas e rejeita JSON incompatível, HTML de fallback, documentos trocados e respostas de chat fora de contexto. 404/501 informam endpoint ausente; erros de rede/servidor são visíveis, **sem fallback para mocks**. Uma pergunta que falha mantém o texto e permite retry. Em falha de upload, o arquivo continua na confirmação. Anexar contexto não possui contrato definido e falha explicitamente sem enviar o arquivo. Logout/exclusão de conta reais aguardam autenticação e endpoints próprios.
+**Mensagens de erro.** O `http.ts` mostra o texto que o backend escreveu para o usuário (`detail` do RFC 7807). Um 5xx sem corpo (o proxy sem backend por trás) orienta a conferir se o backend está rodando; um 500 real do servidor mantém a mensagem genérica. Não há fallback para mocks em modo API.
 
-Nenhum contrato de autenticação foi inventado. Antes de usar documentos reais, a equipe deverá implementar autenticação/autorização no Spring e definir cookies/credenciais, isolamento por usuário, consentimento e retenção. O frontend está preparado para HTTP; **não afirma integração real com PostgreSQL, Tess4J ou Gemini**.
+**Limite de tentativas e recuperação de senha.** Depois de 5 senhas erradas seguidas o backend bloqueia aquele e-mail por 10 segundos (HTTP 429); a tela mostra a mensagem do servidor e a pessoa tenta de novo. A tela `/esqueci-senha` tem dois passos (e-mail; depois código e nova senha) e não deixa a pessoa logada: leva para entrar. Enquanto não há e-mail real, o código é sempre o do backend (`KAUP_CODIGO_FAKE`, padrão 676869); a variável opcional `VITE_FAKE_RESET_CODE` só faz a tela lembrar esse código em ambiente de teste (deixe vazia em produção). A conta de administrador nunca tem a senha alterada por aqui.
 
-## Verificação e comparações
+**Meus dados e prazo.** Em Configurações, "Baixar minhas informações" salva `kaup-meus-dados.json` (conta, preferências, documentos, análises e conversas, sem a senha) e um aviso informa depois de quantos dias os documentos são apagados (`retentionDays`, vindo de `GET /api/perfil`; sem o campo, o aviso some).
 
-Foram executados instalação, lint, testes e build. A revisão do chatbot passou em 44 testes em quatro arquivos; ver [relatório do fluxo](CHAT_FLOW_NOTES.md). Os testes cobrem contadores/filtros, validação, upload e cancelamento, contexto/histórico por documento, perfil, multipart/202, timeout, erros/schema remoto e navegação. Resultados finais estão em [MIGRATION_NOTES.md](MIGRATION_NOTES.md).
+**Administrador.** A conta de administrador vê os documentos de todos. Ao abrir o de outra pessoa, o chat mostra um aviso de somente leitura e esconde o botão de excluir (o backend também recusa).
 
-Chrome automatizado: cinco telas e contexto, nos viewports **390×844, 430×932 e 1280×800**, além dos fluxos de upload, preview, chat, contadores, perfil e logout. A referência foi o `frontend/src/dist/` já existente, servido **somente para leitura**, conferido contra o JSX inspecionado. Não foi feito novo build na pasta original. Capturas e relatórios locais ficam em `validation/`; PNGs são ignorados pelo Git para não adicionar megabytes ao código.
+**Renda e IA.** Em Configurações, o interruptor "Deixar a IA usar minha renda" (ligado por padrão) controla se a faixa de renda é enviada à IA, só no chat. Desligado, ela nunca é enviada, mesmo preenchida. Nome e e-mail nunca vão para a IA.
 
-Para repetir, em terminais separados, a partir desta pasta:
+## Verificação
 
-```bash
-npm run dev
-node scripts/serve-original.mjs
-npm run test:browser
-```
-
-O script usa `/usr/bin/google-chrome`; sobrescreva com `CHROME_PATH=/caminho/do/chrome`. A referência precisa ter seu `dist/` pré-existente. As capturas usam página completa; o desktop mantém a coluna de 430 px.
-
-Para testar o modo API com respostas HTTP **exclusivamente interceptadas no teste**:
-
-```bash
-VITE_DATA_SOURCE=api npm run dev -- --port 5176
-# Em outro terminal:
-npm run test:browser:api
-```
-
-Isso cobre ausência de endpoints sem mocks, FormData, processamento assíncrono, erro/retry de chat e GET/PATCH de perfil. Não substitui testes contra o backend real.
+Os testes automatizados (`npm run test`, Vitest + Testing Library) cobrem contadores/filtros, validação, upload e cancelamento, contexto/histórico por documento, perfil, multipart/202, timeout, erros/schema remoto, navegação e o fluxo do chat. O modo API é testado com respostas HTTP interceptadas no próprio teste; isso não substitui testes contra o backend real.
 
 Checklist manual complementar:
 
@@ -135,19 +123,10 @@ Checklist manual complementar:
 
 A estética original foi mantida. Diferenças documentadas: indicador discreto de dados fictícios; contadores corretos (4/5/6/4/6, total 25; status 15/6/4); análise e respostas explicitamente ilustrativas; contrato fictício de exemplo explicitamente identificado para upload; confirmação/preview/limites; opção de não informar renda; contexto alinhado à coluna no desktop; campos de perfil validados e modais com foco/Escape; erros HTTP visíveis. O chat usa altura dinâmica da viewport e rolagem interna para manter o composer acessível.
 
-Pendências backend detalhadas em [API_CONTRACT_RASCUNHO.md](API_CONTRACT_RASCUNHO.md): upload/armazenamento, status assíncrono, OCR/legibilidade, classificação, resumo/valores estruturados, Gemini via Spring, histórico/chat por documento, perfil, exclusão, exportação e autenticação/autorização. Definir CORS, schemas, limites, política LGPD, isolamento por usuário e contrato para anexos. PostgreSQL permanece exclusivamente atrás do Spring Boot.
-
-Os documentos originais recebidos na subpasta duplicada `frontend-novo/` foram preservados; cópias na raiz desta aplicação facilitam a consulta.
+Pendências que continuam abertas (ver `../docs/planejamento/PLANO_INTEGRACAO.md`): anexar contexto ao chat, narração e entrada por voz, exportação dos dados da pessoa, política de retenção (LGPD), limite de tentativas de login, CORS e HTTPS para publicação, e o processamento assíncrono do envio.
 
 ## Restauração do chatbot demonstrativo
 
 A jornada de renda pertence exclusivamente ao modo mock. Selecionar uma alternativa exige confirmação; durante o envio, alternativas e composer ficam bloqueados. Falhas preservam o envio e permitem retry com o mesmo ID, sem duplicar a mensagem, resposta ou aviso. O mock também reconhece envios já concluídos quando a resposta se perde. “Outra opção” e “Prefiro não informar” não exigem divulgar renda. Etapa, seleção, histórico e rascunho ficam na memória, separados por serviço/sessão e `documentId`.
 
 A introdução revela mensagens em 0/600/1000/1400 ms; uploads têm processamento demonstrativo de 3,2 s e pausa inicial de 300 ms. A resposta de renda leva 1,8 s e o aviso aparece 800 ms depois. O modo API usa as mensagens efetivamente retornadas pelo servidor, sem acrescentar pergunta de renda, respostas fictícias ou aviso por detectar “R$” no texto. Idempotência de gravação no backend real ainda precisa de contrato próprio; a proteção atual do retry remoto evita duplicação na interface.
-
-```bash
-# Com a nova aplicação em 5174 e a referência original em 5175:
-npm run test:browser:chat
-```
-
-O script compara seleção de renda e resposta no Chrome nas três resoluções, valida digitação/chat livre/retorno e testa a jornada de upload. As capturas usam os mesmos arquivos locais Nunito; somente no navegador de teste, a requisição Google Fonts do original é interceptada para evitar instabilidade de rede. Nenhum arquivo original é alterado. Ver [CHAT_FLOW_NOTES.md](CHAT_FLOW_NOTES.md) para arquivos, validações e diferenças intencionais.

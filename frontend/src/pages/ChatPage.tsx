@@ -12,6 +12,7 @@ import ContextPopup from "../components/chat/ContextPopup";
 import TypingBubble from "../components/chat/TypingBubble";
 import MessageList from "../components/chat/MessageList";
 import ChatComposer from "../components/chat/ChatComposer";
+import DocumentActions from "../components/chat/DocumentActions";
 export default function ChatPage() {
   const { documentId } = useParams();
   const { service } = useApp();
@@ -171,6 +172,7 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
             </div>
           </div>
         </div>
+        <DocumentActions doc={doc} />
       </div>
 
       {/* ── CONTEXT POPUP ── */}
@@ -200,6 +202,12 @@ function ChatView({ doc, onBack }: { doc: DocumentView; onBack: () => void }) {
       ) : phase === "loading" ? (
         service.mode === "mock" ? (
           <LoadingScreen doc={doc} />
+        ) : analysis?.processingStatus === "pending" ||
+          analysis?.processingStatus === "processing" ? (
+          <ResourceState
+            loading
+            message="Estamos lendo seu contrato. Pode sair desta tela: o documento fica na sua lista e avisamos lá quando terminar."
+          />
         ) : (
           <ResourceState loading />
         )

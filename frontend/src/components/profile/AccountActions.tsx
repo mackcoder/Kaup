@@ -9,8 +9,10 @@ export default function AccountActions({ model }: { model: ProfileModel }) {
     setDeleteSimulated,
     showLogoutConfirm,
     setShowLogoutConfirm,
-    setLoggedOut,
-    setHelpMsg,
+    accountError,
+    accountBusy,
+    confirmLogout,
+    confirmDeleteAccount,
     tapped,
     fs,
     tap,
@@ -46,12 +48,14 @@ export default function AccountActions({ model }: { model: ProfileModel }) {
               Apagar sua conta?
             </div>
             <div className="kaup-197" style={{ fontSize: fs(14) }}>
-              Simulação: nenhum dado de servidor será apagado.
+              {service.mode === "mock"
+                ? "Simulação: nenhum dado de servidor será apagado."
+                : "Isto apaga sua conta, seus documentos e as conversas. Não dá para desfazer."}
             </div>
           </div>
-          {service.mode === "api" && (
+          {accountError && (
             <p role="alert" className="feedback">
-              Exclusão de conta ainda não disponível na API.
+              {accountError}
             </p>
           )}
           {deleteSimulated ? (
@@ -76,18 +80,12 @@ export default function AccountActions({ model }: { model: ProfileModel }) {
           ) : (
             <div className="kaup-202">
               <button
-                disabled={service.mode === "api"}
-                onClick={() =>
-                  service.mode === "mock"
-                    ? setDeleteSimulated(true)
-                    : setHelpMsg(
-                        "Exclusão de conta depende de autenticação e endpoint ainda não implementados.",
-                      )
-                }
+                disabled={accountBusy}
+                onClick={() => void confirmDeleteAccount()}
                 className="kaup-203"
                 style={{ fontSize: fs(16) }}
               >
-                🗑️ Sim, apagar
+                {accountBusy ? "Apagando..." : "🗑️ Sim, apagar"}
               </button>
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -110,9 +108,9 @@ export default function AccountActions({ model }: { model: ProfileModel }) {
           fullOverlay
         >
           <div className="kaup-193" />
-          {service.mode === "api" && (
+          {accountError && (
             <p role="alert" className="feedback">
-              Logout real depende do contrato de autenticação do backend.
+              {accountError}
             </p>
           )}
           <div className="kaup-205">
@@ -123,18 +121,12 @@ export default function AccountActions({ model }: { model: ProfileModel }) {
           </div>
           <div className="kaup-202">
             <button
-              onClick={() => {
-                setShowLogoutConfirm(false);
-                if (service.mode === "mock") setLoggedOut(true);
-                else
-                  setHelpMsg(
-                    "Logout real depende do contrato de autenticação do backend.",
-                  );
-              }}
+              disabled={accountBusy}
+              onClick={() => void confirmLogout()}
               className="kaup-203"
               style={{ fontSize: fs(16) }}
             >
-              Sim, sair
+              {accountBusy ? "Saindo..." : "Sim, sair"}
             </button>
             <button
               onClick={() => setShowLogoutConfirm(false)}

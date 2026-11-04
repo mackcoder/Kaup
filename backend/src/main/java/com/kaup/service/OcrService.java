@@ -3,11 +3,15 @@ package com.kaup.service;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Iterator;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -39,10 +43,13 @@ public class OcrService {
 
     private final Tesseract tesseract;
     private final int maxPaginas;
+    private final long maxPixels;
 
-    public OcrService(Tesseract tesseract, @Value("${ocr.max-paginas}") int maxPaginas) {
+    public OcrService(Tesseract tesseract, @Value("${ocr.max-paginas}") int maxPaginas,
+                      @Value("${ocr.max-pixels}") long maxPixels) {
         this.tesseract = tesseract;
         this.maxPaginas = maxPaginas;
+        this.maxPixels = maxPixels;
     }
 
     public String extrairTexto(MultipartFile arquivo) throws IOException {
@@ -55,15 +62,25 @@ public class OcrService {
 
     private String extrairDePdf(byte[] bytes) {
         try (PDDocument documento = Loader.loadPDF(bytes)) {
+            // O limite vale antes de qualquer extração: um PDF digital enorme também custa caro.
+            int paginas = documento.getNumberOfPages();
+            if (paginas > maxPaginas) {
+                throw new ContratoInvalidoException(
+                        "O PDF tem " + paginas + " páginas. O máximo permitido é " + maxPaginas + ".");
+            }
+
             String digital = new PDFTextStripper().getText(documento).trim();
             if (digital.length() >= MIN_CARACTERES_PDF_DIGITAL) {
                 return digital;
             }
 
-            int paginas = documento.getNumberOfPages();
-            if (paginas > maxPaginas) {
-                throw new ContratoInvalidoException(
-                        "O PDF tem " + paginas + " páginas. O máximo permitido é " + maxPaginas + ".");
+            // Página gigante (ex.: 200 m de lado) viraria uma imagem de bilhões de pixels.
+            for (int i = 0; i < paginas; i++) {
+                PDRectangle caixa = documento.getPage(i).getMediaBox();
+                double pixels = (double) caixa.getWidth() / 72 * DPI * caixa.getHeight() / 72 * DPI;
+                if (pixels > maxPixels) {
+                    throw new ContratoInvalidoException("As páginas do PDF são grandes demais para ler.");
+                }
             }
 
             PDFRenderer renderizador = new PDFRenderer(documento);
@@ -82,11 +99,32 @@ public class OcrService {
     }
 
     private String extrairDeImagem(byte[] bytes) throws IOException {
-        BufferedImage imagem = ImageIO.read(new ByteArrayInputStream(bytes));
-        if (imagem == null) {
-            throw new ContratoInvalidoException("Não foi possível ler a imagem enviada.");
-        }
+        BufferedImage imagem = lerImagem(bytes);
         return reconhecer(imagem).trim();
+    }
+
+    // Lê só o cabeçalho para saber o tamanho: decodificar antes de medir deixaria uma imagem
+    // pequena em bytes e enorme em pixels estourar a memória.
+    private BufferedImage lerImagem(byte[] bytes) throws IOException {
+        try (ImageInputStream entrada = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+            Iterator<ImageReader> leitores = entrada == null ? null : ImageIO.getImageReaders(entrada);
+            if (leitores == null || !leitores.hasNext()) {
+                throw new ContratoInvalidoException("Não foi possível ler a imagem enviada.");
+            }
+            ImageReader leitor = leitores.next();
+            try {
+                leitor.setInput(entrada);
+                if ((long) leitor.getWidth(0) * leitor.getHeight(0) > maxPixels) {
+                    throw new ContratoInvalidoException("A imagem é grande demais. Envie uma foto de até "
+                            + maxPixels / 1_000_000 + " megapixels.");
+                }
+                return leitor.read(0);
+            } catch (IOException e) {
+                throw new ContratoInvalidoException("Não foi possível ler a imagem enviada.");
+            } finally {
+                leitor.dispose();
+            }
+        }
     }
 
     private String reconhecer(BufferedImage imagem) {

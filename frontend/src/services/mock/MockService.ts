@@ -19,6 +19,8 @@ import type {
   DocumentAnalysis,
   KaupDocument,
   UserProfile,
+  AuthUser,
+  ResetPasswordInput,
 } from "../../types/domain";
 const months = [
   "jan",
@@ -61,7 +63,43 @@ export class MockService implements KaupService {
     explainLevel: "simple",
     income: "prefer_not",
     audio: false,
+    shareIncomeWithAi: true,
+    retentionDays: 180,
   };
+  // A demonstração não tem contas: há sempre alguém "logado" e sair é só uma simulação na tela.
+  onUnauthorized: (() => void) | null = null;
+  private demoUser: AuthUser = {
+    id: "demo",
+    name: "João da Silva",
+    email: "joao@email.com",
+    role: "USER",
+  };
+  async getSession() {
+    return structuredClone(this.demoUser);
+  }
+  async register() {
+    return structuredClone(this.demoUser);
+  }
+  async login() {
+    return structuredClone(this.demoUser);
+  }
+  async logout() {}
+  async requestPasswordReset() {}
+  async resetPassword(input: ResetPasswordInput) {
+    if (input.code.trim() !== "676869")
+      throw new Error(
+        "Código inválido. Confira o e-mail e o código e tente de novo.",
+      );
+  }
+  async exportData() {
+    return {
+      demo: true,
+      aviso: "Arquivo de demonstração: nenhum dado real foi exportado.",
+      account: structuredClone(this.demoUser),
+      documents: structuredClone(this.docs),
+    };
+  }
+  async deleteAccount() {}
   async listDocuments() {
     return structuredClone(this.docs);
   }
@@ -255,8 +293,8 @@ export class MockService implements KaupService {
   async getProfile() {
     return structuredClone(this.profile);
   }
-  async updateProfile(profile: UserProfile) {
-    this.profile = structuredClone(profile);
+  async updateProfile(patch: Partial<UserProfile>) {
+    this.profile = { ...this.profile, ...structuredClone(patch) };
     return this.getProfile();
   }
   async health() {

@@ -1,9 +1,11 @@
 import type {
+  AuthUser,
   DocumentAnalysis,
   KaupDocument,
   ProcessingStatus,
   UserProfile,
   ChatMessage,
+  ContextFile,
 } from "../../types/domain";
 import { ApiError } from "./http";
 export interface DocumentDTO {
@@ -14,6 +16,7 @@ export interface DocumentDTO {
   createdAt: string;
   description?: string;
   visualStatus?: "ok" | "warning" | "pending";
+  failureReason?: string | null;
 }
 export interface ChatReplyDTO {
   id: string;
@@ -67,8 +70,19 @@ export function documentFromDTO(value: unknown): KaupDocument {
     processingStatus: state,
     createdAt,
     description:
-      typeof d.description === "string" ? d.description : "Documento enviado",
+      state === "failed" && typeof d.failureReason === "string"
+        ? d.failureReason
+        : state === "pending" || state === "processing"
+          ? "Lendo o contrato…"
+          : typeof d.description === "string"
+            ? d.description
+            : "Documento enviado",
+    ...(typeof d.failureReason === "string" && {
+      failureReason: d.failureReason,
+    }),
     emoji: "📄",
+    // Ausente (versões antigas do backend): trata como do próprio usuário.
+    ownedByMe: typeof d.ownedByMe === "boolean" ? d.ownedByMe : true,
     status:
       d.visualStatus === "ok" ||
       d.visualStatus === "warning" ||
@@ -118,6 +132,18 @@ export function messageFromDTO(value: unknown): ChatMessage {
     state: "sent",
   };
 }
+export function contextFileFromDTO(value: unknown): ContextFile & {
+  documentId: string;
+} {
+  const a = record(value);
+  const mime = typeof a.mimeType === "string" ? a.mimeType : "";
+  return {
+    documentId: string(a.documentId),
+    emoji: mime.startsWith("image/") ? "🖼️" : "📑",
+    name: string(a.name),
+    type: "Anexo",
+  };
+}
 export function profileFromDTO(value: unknown): UserProfile {
   const p = record(value);
   if (
@@ -126,7 +152,8 @@ export function profileFromDTO(value: unknown): UserProfile {
     !["less3", "3to5", "5to7", "7to15", "more15", "prefer_not"].includes(
       String(p.income),
     ) ||
-    typeof p.audio !== "boolean"
+    typeof p.audio !== "boolean" ||
+    typeof p.shareIncomeWithAi !== "boolean"
   )
     throw new ApiError("Preferências incompatíveis com o contrato de perfil.");
   return {
@@ -136,5 +163,22 @@ export function profileFromDTO(value: unknown): UserProfile {
     explainLevel: p.explainLevel as UserProfile["explainLevel"],
     income: p.income as UserProfile["income"],
     audio: p.audio,
+    shareIncomeWithAi: p.shareIncomeWithAi,
+    // Só informa o prazo na tela: se faltar, apenas some o aviso (não vale recusar o perfil por isso).
+    retentionDays:
+      typeof p.retentionDays === "number" && p.retentionDays > 0
+        ? Math.floor(p.retentionDays)
+        : 0,
+  };
+}
+export function authUserFromDTO(value: unknown): AuthUser {
+  const u = record(value);
+  if (u.role !== "USER" && u.role !== "ADMIN")
+    throw new ApiError("Papel de usuário inválido.");
+  return {
+    id: string(u.id),
+    name: string(u.name),
+    email: string(u.email),
+    role: u.role,
   };
 }

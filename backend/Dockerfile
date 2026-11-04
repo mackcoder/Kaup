@@ -12,8 +12,14 @@ RUN apt-get update \
         tesseract-ocr tesseract-ocr-por libtesseract-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# Sem root: se algo no processo for explorado, não há poderes de administrador no container.
+RUN useradd --system --uid 10001 --no-create-home kaup
+
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
+USER kaup
 EXPOSE 8080
 
-CMD ["java", "-jar", "app.jar"]
+# A JVM usa até 75% da memória do container; se faltar mesmo assim (ex.: PDF hostil), ela encerra e o
+# Docker reinicia só o backend (restart: unless-stopped), em vez de o servidor inteiro travar.
+CMD ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", "-jar", "app.jar"]

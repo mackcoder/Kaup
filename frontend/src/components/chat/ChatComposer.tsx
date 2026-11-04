@@ -54,6 +54,7 @@ export default function ChatComposer({
           <input
             aria-label="Mensagem sobre o documento"
             minLength={1}
+            maxLength={2000} // o backend recusa perguntas maiores
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}

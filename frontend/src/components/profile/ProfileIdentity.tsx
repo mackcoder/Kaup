@@ -4,6 +4,7 @@ export default function ProfileIdentity({ model }: { model: ProfileModel }) {
   const {
     name,
     email,
+    user,
     editName,
     setEditName,
     editEmail,
@@ -73,6 +74,11 @@ export default function ProfileIdentity({ model }: { model: ProfileModel }) {
             <div className="kaup-229" style={{ fontSize: fs(14) }}>
               {email}
             </div>
+            {user?.role === "ADMIN" && (
+              <div className="admin-badge" style={{ fontSize: fs(13) }}>
+                🛡️ Administrador: você vê os documentos de todos
+              </div>
+            )}
           </div>
 
           {savedMsg && (

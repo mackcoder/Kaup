@@ -266,3 +266,223 @@ button:disabled {
   line-height: 1.5;
   color: #475569;
 }
+/* ── Entrar e criar conta ── */
+.auth-page {
+  max-width: 430px;
+  margin: 0 auto;
+  padding: 56px 24px 40px;
+  color: var(--kaup-text);
+}
+.auth-brand {
+  font-size: 44px;
+  text-align: center;
+}
+.auth-app-name {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--kaup-muted);
+}
+.auth-title {
+  margin: 6px 0;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 900;
+}
+.auth-subtitle {
+  margin: 0 0 24px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--kaup-muted);
+}
+.auth-card {
+  background: #fff;
+  border: 1.5px solid var(--kaup-border);
+  border-radius: 22px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+.auth-field {
+  margin-bottom: 16px;
+}
+.auth-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 800;
+}
+.auth-field small {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--kaup-muted);
+}
+/* 16px ou mais evita o zoom automático do iPhone ao focar no campo. */
+.auth-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--kaup-text);
+  background: #f8fafc;
+  border: 2px solid var(--kaup-border);
+  border-radius: 14px;
+}
+.auth-password {
+  display: flex;
+  gap: 8px;
+}
+.auth-toggle {
+  min-width: 92px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1.5px solid var(--kaup-border);
+  border-radius: 14px;
+  cursor: pointer;
+}
+.auth-error {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  border-radius: 14px;
+}
+.auth-card .primary-button {
+  min-height: 52px;
+  font-size: 17px;
+}
+.auth-switch {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+.auth-switch a {
+  color: var(--kaup-blue);
+  font-weight: 900;
+}
+.auth-note {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e3a8a;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 14px;
+}
+.privacy-note {
+  margin: 12px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: #475569;
+}
+.auth-link {
+  padding: 0;
+  font: inherit;
+  font-weight: 900;
+  color: var(--kaup-blue);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+/* ── Perfil: aviso do administrador e interruptor da renda ── */
+.admin-badge {
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-weight: 800;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 12px;
+}
+.share-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  color: #334155;
+  background: #fff;
+  border: 2px solid var(--kaup-border);
+  border-radius: 16px;
+  cursor: pointer;
+}
+.share-toggle.on {
+  background: #eff6ff;
+  border-color: var(--kaup-blue);
+}
+.share-toggle-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+.share-toggle-text small {
+  font-weight: 600;
+  color: var(--kaup-muted);
+}
+.share-toggle-track {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 30px;
+  background: #cbd5e1;
+  border-radius: 999px;
+  transition: background 0.15s;
+}
+.share-toggle.on .share-toggle-track {
+  background: var(--kaup-blue);
+}
+.share-toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+.share-toggle.on .share-toggle-knob {
+  transform: translateX(22px);
+}
+/* ── Ações do documento ── */
+.delete-doc-button {
+  min-height: 44px;
+  margin-top: 8px;
+  padding: 0 14px;
+  font-size: 14px;
+  font-weight: 800;
+  color: #b91c1c;
+  background: transparent;
+  border: 1.5px solid #fecaca;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.readonly-note {
+  margin: 8px 0 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 12px;
+}
+.primary-button.danger {
+  background: #dc2626;
+}

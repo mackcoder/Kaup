@@ -58,7 +58,17 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Subir Postgres e backend
-        run: docker compose up -d --build postgres backend
+        run: |
+          echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)" > .env
+          # Os passos abaixo fazem dezenas de chamadas seguidas do mesmo IP; com os limites padrao
+          # (feitos para a demonstracao) o resultado dependeria da velocidade do runner. O filtro de
+          # IP tem testes de unidade proprios.
+          {
+            echo "KAUP_LIMITE_IP_POR_MINUTO=10000"
+            echo "KAUP_LIMITE_AUTH_POR_MINUTO=10000"
+            echo "KAUP_LIMITE_CADASTROS_POR_HORA=10000"
+          } >> .env
+          docker compose up -d --build postgres backend
 
       - name: Esperar o backend responder
         run: |
@@ -73,15 +83,73 @@ jobs:
           docker compose logs backend --tail 100
           exit 1
 
-      - name: Conferir que a tabela analise foi criada
-        run: docker compose exec -T postgres psql -U usuario_app -d gestao_contratos -c "\dt" | grep analise
-
-      - name: Texto vazio deve retornar 400
+      - name: Conferir que as tabelas foram criadas (documentos, contas, conversas e sessões)
         run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/analise/texto \
-            -H "Content-Type: application/json" -d '{"texto":""}')
+          tabelas=$(docker compose exec -T postgres psql -U usuario_app -d gestao_contratos -c "\dt")
+          echo "$tabelas"
+          for t in documento usuario mensagem_chat spring_session; do
+            echo "$tabelas" | grep -q "$t" || { echo "faltou a tabela $t"; exit 1; }
+          done
+
+      - name: Sem login a API recusa (401), exceto o health
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/documentos)
+          echo "GET /api/documentos sem login: HTTP $code"
+          test "$code" = "401"
+
+      - name: Entrar como administrador (conta criada na subida)
+        run: |
+          J=/tmp/jar-admin.txt
+          # O primeiro GET responde 401 mas já entrega o cookie XSRF-TOKEN, que o login precisa devolver.
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          test -n "$TOKEN"
+          resposta=$(curl -fsS -c $J -b $J -X POST http://localhost:8080/api/auth/entrar \
+            -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
+            -d '{"email":"ADMIN@ADMIN","password":"ADMIN"}')
+          echo "$resposta"
+          echo "$resposta" | grep -q '"role":"ADMIN"'
+
+      - name: Cadastro valida a senha e já deixa a pessoa logada
+        run: |
+          J=/tmp/jar-ci.txt
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          cadastrar() {
+            curl -s -c $J -b $J -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/auth/cadastro \
+              -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" -d "$1"
+          }
+          code=$(cadastrar '{"name":"Ci","email":"ci@teste.com","password":"senha1234","confirmPassword":"outra1234"}')
+          echo "senhas diferentes: HTTP $code"; test "$code" = "400"
+          code=$(cadastrar '{"name":"Ci","email":"ci@teste.com","password":"senha1234","confirmPassword":"senha1234"}')
+          echo "cadastro valido: HTTP $code"; test "$code" = "201"
+          code=$(curl -s -c $J -b $J -o /dev/null -w "%{http_code}" http://localhost:8080/api/auth/eu)
+          echo "logado depois do cadastro: HTTP $code"; test "$code" = "200"
+
+      - name: Perfil padrão e atualização
+        run: |
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          curl -fsS -b $J http://localhost:8080/api/perfil | tee perfil.json; echo
+          grep -q '"fontSize":"large"' perfil.json
+          grep -q '"shareIncomeWithAi":true' perfil.json
+          curl -fsS -b $J -c $J -X PATCH http://localhost:8080/api/perfil \
+            -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
+            -d '{"explainLevel":"complete","shareIncomeWithAi":false}' | tee perfil.json; echo
+          grep -q '"explainLevel":"complete"' perfil.json
+          grep -q '"shareIncomeWithAi":false' perfil.json
+
+      - name: Listagem de documentos deve responder com lista vazia para a pessoa nova
+        run: |
+          resposta=$(curl -fsS -b /tmp/jar-ci.txt http://localhost:8080/api/documentos)
+          echo "$resposta"
+          test "$resposta" = "[]"
+
+      - name: Documento inexistente deve retornar 404
+        run: |
+          code=$(curl -s -b /tmp/jar-ci.txt -o /dev/null -w "%{http_code}" http://localhost:8080/api/documentos/nao-existe)
           echo "HTTP $code"
-          test "$code" = "400"
+          test "$code" = "404"
 
       - name: OCR local deve ler uma imagem
         run: |
@@ -95,11 +163,85 @@ jobs:
           d.text((40, 120), "O locatario pagara R$ 1.500,00 por mes, ate o dia 5.", font=font, fill="black")
           img.save("contrato.png")
           EOF
-          # Sem chave do Gemini, a resposta esperada e 502 "IA (Gemini)":
-          # isso prova que o OCR local passou e so a etapa da IA falhou.
-          curl -s -X POST http://localhost:8080/api/analise/contrato -F "arquivo=@contrato.png;type=image/png" | tee resposta.json
-          echo
-          grep -q "Gemini" resposta.json
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          # O envio responde 202 na hora e a leitura roda em segundo plano. Sem chave do Gemini o
+          # documento termina em "failed" com o motivo "servico de leitura indisponivel": isso prova
+          # que o OCR local passou (se ele falhasse, o motivo seria outro) e so a etapa da IA falhou.
+          code=$(curl -s -o resposta.json -w "%{http_code}" -b $J -X POST http://localhost:8080/api/documentos \
+            -H "X-XSRF-TOKEN: $TOKEN" -H "Idempotency-Key: ci-ocr-1" \
+            -F "file=@contrato.png;type=image/png")
+          cat resposta.json; echo
+          test "$code" = "202"
+          grep -q '"processingStatus":"pending"' resposta.json
+          ID=$(python3 -c "import json; print(json.load(open('resposta.json'))['id'])")
+          # Reenvio com a mesma chave devolve o mesmo documento.
+          curl -s -b $J -X POST http://localhost:8080/api/documentos -H "X-XSRF-TOKEN: $TOKEN" \
+            -H "Idempotency-Key: ci-ocr-1" -F "file=@contrato.png;type=image/png" | grep -q "\"id\":\"$ID\""
+          for i in $(seq 1 30); do
+            curl -s -b $J http://localhost:8080/api/documentos/$ID > doc.json
+            grep -q '"processingStatus":"failed"' doc.json && break
+            sleep 2
+          done
+          cat doc.json; echo
+          grep -q '"processingStatus":"failed"' doc.json
+          grep -q "indispon" doc.json
+
+      - name: Exportar os dados da conta (sem a senha)
+        run: |
+          J=/tmp/jar-ci.txt
+          code=$(curl -s -b $J -o exportacao.json -D cab.txt -w "%{http_code}" http://localhost:8080/api/conta/exportar)
+          echo "GET /api/conta/exportar: HTTP $code"; test "$code" = "200"
+          grep -qi 'content-disposition: attachment' cab.txt
+          grep -q '"account"' exportacao.json
+          ! grep -qi 'senha\|password\|\$2a\$' exportacao.json
+          code=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/api/conta/exportar)
+          echo "sem login: HTTP $code"; test "$code" = "401"
+
+      - name: Muitas senhas erradas bloqueiam o login por alguns segundos (429)
+        run: |
+          J=/tmp/jar-limite.txt
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          entrar() {
+            curl -s -c $J -b $J -o /dev/null -w "%{http_code}" -X POST http://localhost:8080/api/auth/entrar \
+              -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" \
+              -d '{"email":"limite@ci.test","password":"errada12345"}'
+          }
+          for i in 1 2 3 4 5; do test "$(entrar)" = "401"; done
+          code=$(entrar); echo "6a tentativa: HTTP $code"; test "$code" = "429"
+          sleep 11
+          code=$(entrar); echo "depois de 11 s: HTTP $code"; test "$code" = "401"
+
+      - name: Recuperação de senha simulada (código fixo) e o administrador nunca é alterado
+        run: |
+          J=/tmp/jar-rec.txt
+          curl -s -c $J -b $J -o /dev/null http://localhost:8080/api/auth/eu
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          post() {
+            curl -s -c $J -b $J -o /dev/null -w "%{http_code}" -X POST "http://localhost:8080$1" \
+              -H "Content-Type: application/json" -H "X-XSRF-TOKEN: $TOKEN" -d "$2"
+          }
+          test "$(post /api/auth/cadastro '{"name":"Rec","email":"rec@ci.test","password":"senha1234","confirmPassword":"senha1234"}')" = "201"
+          post /api/auth/sair '{}' >/dev/null
+          test "$(post /api/auth/recuperar/solicitar '{"email":"rec@ci.test"}')" = "204"
+          test "$(post /api/auth/recuperar/solicitar '{"email":"ninguem@ci.test"}')" = "204"
+          test "$(post /api/auth/recuperar/redefinir '{"email":"rec@ci.test","code":"000000","password":"novasenha1","confirmPassword":"novasenha1"}')" = "400"
+          # Administrador: mesmo com o código certo, a resposta é a de um código errado.
+          test "$(post /api/auth/recuperar/redefinir '{"email":"ADMIN@ADMIN","code":"676869","password":"novasenha1","confirmPassword":"novasenha1"}')" = "400"
+          test "$(post /api/auth/recuperar/redefinir '{"email":"rec@ci.test","code":"676869","password":"novasenha1","confirmPassword":"novasenha1"}')" = "204"
+          test "$(post /api/auth/entrar '{"email":"rec@ci.test","password":"senha1234"}')" = "401"
+          test "$(post /api/auth/entrar '{"email":"rec@ci.test","password":"novasenha1"}')" = "200"
+          test "$(post /api/auth/entrar '{"email":"ADMIN@ADMIN","password":"ADMIN"}')" = "200"
+
+      - name: Excluir a conta apaga a pessoa e encerra a sessão
+        run: |
+          J=/tmp/jar-ci.txt
+          TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
+          code=$(curl -s -b $J -c $J -o /dev/null -w "%{http_code}" -X DELETE http://localhost:8080/api/conta -H "X-XSRF-TOKEN: $TOKEN")
+          echo "DELETE /api/conta: HTTP $code"; test "$code" = "204"
+          code=$(curl -s -b $J -o /dev/null -w "%{http_code}" http://localhost:8080/api/auth/eu)
+          echo "depois de excluir: HTTP $code"; test "$code" = "401"
 
       - name: Logs do backend (se algo falhou)
         if: failure()

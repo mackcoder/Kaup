@@ -1,7 +1,7 @@
 package com.kaup.exception;
 
-/** Requisição com arquivo ou texto de contrato inválido (erro do cliente). */
-public class ContratoInvalidoException extends RuntimeException {
+/** Requisição com arquivo, texto de contrato ou pergunta inválidos (erro do cliente). */
+public class ContratoInvalidoException extends DadosInvalidosException {
 
     public ContratoInvalidoException(String mensagem) {
         super(mensagem);

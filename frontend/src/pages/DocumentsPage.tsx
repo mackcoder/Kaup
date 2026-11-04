@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useApp } from "../app/AppProvider";
 import type { DocumentView, FilterKey } from "../types/domain";
-import { STATUS as STATUS_CFG } from "../styles/status";
+import { statusOf } from "../styles/status";
 import {
   filterDocuments,
   countDocuments,
@@ -209,7 +209,7 @@ export default function AllDocumentsPage({
                 <div className="kaup-85">
                   {catDocs.map((doc, i) => {
                     const globalIdx = ALL_DOCS.indexOf(doc);
-                    const st = STATUS_CFG[doc.status];
+                    const st = statusOf(doc);
                     const isTapped = tapped === globalIdx;
                     const isLast = i === catDocs.length - 1;
 
@@ -255,6 +255,7 @@ export default function AllDocumentsPage({
                         <div className="kaup-92">
                           <div
                             className="kaup-93"
+                            title={st.label}
                             style={{
                               background: st.bg,
                               border: `1.5px solid ${st.border}`,

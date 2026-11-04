@@ -18,6 +18,10 @@ export interface KaupDocument {
   isNew?: boolean;
   demo?: boolean;
   uploaded?: boolean;
+  /** Falso quando o administrador consulta o documento de outra pessoa (somente leitura). */
+  ownedByMe?: boolean;
+  /** Motivo (em português) de o documento ter ficado em "failed". */
+  failureReason?: string;
 }
 export interface DocumentCategory {
   key: string;
@@ -81,6 +85,30 @@ export interface UserProfile {
   explainLevel: ExplainLevel;
   income: IncomeRange;
   audio: boolean;
+  /** Falso: a renda nunca é enviada à IA, mesmo preenchida. */
+  shareIncomeWithAi: boolean;
+  /** Depois de quantos dias os documentos são apagados; 0 se nunca. Só informativo (vem do servidor). */
+  retentionDays: number;
+}
+/** Quem está logado (modo API). O administrador vê os documentos de todos. */
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "USER" | "ADMIN";
+}
+export interface RegisterInput {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+/** Segundo passo de "esqueci minha senha": o código recebido e a nova senha. */
+export interface ResetPasswordInput {
+  email: string;
+  code: string;
+  password: string;
+  confirmPassword: string;
 }
 export type UploadState =
   "idle" | "confirming" | "uploading" | "failed" | "success";

@@ -26,8 +26,13 @@ export default function UploadDialog({
     [state, setState] = useState<UploadState>("idle");
   const fileRef = useRef<HTMLInputElement>(null),
     photoRef = useRef<HTMLInputElement>(null),
-    request = useRef<AbortController | null>(null);
+    request = useRef<AbortController | null>(null),
+    // Uma chave por arquivo escolhido: tentar de novo o mesmo envio não cria outro documento.
+    idempotencyKey = useRef<string>(crypto.randomUUID());
   const cat = categories.find((c) => c.key === categoryId);
+  const confirmTitle = contextId
+    ? "Adicionar ao contexto"
+    : "Confirmar documento";
   useEffect(() => {
     if (initialCapture) photoRef.current?.click();
   }, [initialCapture]);
@@ -48,6 +53,7 @@ export default function UploadDialog({
     const message = validateFile(candidate);
     setError(message);
     if (message) return;
+    idempotencyKey.current = crypto.randomUUID();
     setFile(candidate);
     setState("confirming");
   }
@@ -68,7 +74,12 @@ export default function UploadDialog({
         onAttached?.();
         close();
       } else {
-        const doc = await service.upload(file, categoryId, controller.signal);
+        const doc = await service.upload(
+          file,
+          categoryId,
+          controller.signal,
+          idempotencyKey.current,
+        );
         if (controller.signal.aborted) return;
         acceptDocument(doc);
         setState("success");
@@ -83,10 +94,7 @@ export default function UploadDialog({
     }
   }
   return (
-    <Modal
-      label={file ? "Confirmar documento" : "Como deseja enviar?"}
-      onClose={close}
-    >
+    <Modal label={file ? confirmTitle : "Como deseja enviar?"} onClose={close}>
       {cat && (
         <div
           className="category-pill"
@@ -100,7 +108,7 @@ export default function UploadDialog({
         </div>
       )}
       <h2 className="sheet-title">
-        {file ? "Confirmar documento" : "Como deseja enviar?"}
+        {file ? confirmTitle : "Como deseja enviar?"}
       </h2>
       <p className="sheet-subtitle">
         {file
@@ -127,7 +135,9 @@ export default function UploadDialog({
           <p className="demo-copy">
             {service.mode === "mock"
               ? "Demonstração: o arquivo não sai do navegador. Não haverá OCR nem análise real."
-              : "Envio ao Spring Boot. Upload e processamento dependem dos endpoints propostos."}
+              : contextId
+                ? "O texto do arquivo é lido no servidor e passa a ser usado nas próximas respostas do chat."
+                : "O arquivo é lido no servidor para gerar o resumo. A leitura segue em segundo plano: você pode sair desta tela."}
           </p>
           <button
             className="primary-button wide"
