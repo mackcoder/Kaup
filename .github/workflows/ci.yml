@@ -157,12 +157,27 @@ jobs:
           EOF
           J=/tmp/jar-ci.txt
           TOKEN=$(awk '$6=="XSRF-TOKEN"{print $7}' $J | tail -1)
-          # Sem chave do Gemini, a resposta esperada e 502 "IA (Gemini)":
-          # isso prova que o OCR local passou e so a etapa da IA falhou.
+          # O envio responde 202 na hora e a leitura roda em segundo plano. Sem chave do Gemini o
+          # documento termina em "failed" com o motivo "servico de leitura indisponivel": isso prova
+          # que o OCR local passou (se ele falhasse, o motivo seria outro) e so a etapa da IA falhou.
+          code=$(curl -s -o resposta.json -w "%{http_code}" -b $J -X POST http://localhost:8080/api/documentos \
+            -H "X-XSRF-TOKEN: $TOKEN" -H "Idempotency-Key: ci-ocr-1" \
+            -F "file=@contrato.png;type=image/png")
+          cat resposta.json; echo
+          test "$code" = "202"
+          grep -q '"processingStatus":"pending"' resposta.json
+          ID=$(python3 -c "import json; print(json.load(open('resposta.json'))['id'])")
+          # Reenvio com a mesma chave devolve o mesmo documento.
           curl -s -b $J -X POST http://localhost:8080/api/documentos -H "X-XSRF-TOKEN: $TOKEN" \
-            -F "file=@contrato.png;type=image/png" | tee resposta.json
-          echo
-          grep -q "Gemini" resposta.json
+            -H "Idempotency-Key: ci-ocr-1" -F "file=@contrato.png;type=image/png" | grep -q "\"id\":\"$ID\""
+          for i in $(seq 1 30); do
+            curl -s -b $J http://localhost:8080/api/documentos/$ID > doc.json
+            grep -q '"processingStatus":"failed"' doc.json && break
+            sleep 2
+          done
+          cat doc.json; echo
+          grep -q '"processingStatus":"failed"' doc.json
+          grep -q "indispon" doc.json
 
       - name: Exportar os dados da conta (sem a senha)
         run: |
