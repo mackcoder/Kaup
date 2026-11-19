@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-labelledby="t d">
+<title id="t">Kaup — Contrato Fácil</title>
+<desc id="d">Animação: um contrato percorre as etapas Upload, OCR local, Gemini e Chat.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0A1B36"/><stop offset="1" stop-color="#14305A"/></linearGradient></defs>
+<rect width="1280" height="320" rx="24" fill="url(#bg)"/>
+<circle cx="1230" cy="40" r="120" fill="#19C3A6" opacity="0.10"/>
+<circle cx="60" cy="300" r="90" fill="#5B7C99" opacity="0.15"/>
+<text x="56" y="130" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="84" font-weight="800" fill="#FFFFFF">Kaup</text>
+<text x="58" y="176" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="26" font-weight="600" fill="#19C3A6">Contrato Fácil</text>
+<text x="58" y="222" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#EAF4F5">Leia, entenda e converse sobre o seu</text>
+<text x="58" y="248" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="20" fill="#EAF4F5">contrato com ajuda de IA.</text>
+<line x1="720" y1="160" x2="1140" y2="160" stroke="#5B7C99" stroke-width="3" stroke-dasharray="8 8"/>
+<circle cx="720" cy="160" r="30" fill="none" stroke="#19C3A6" stroke-width="3"><animate attributeName="opacity" values="0.25;0.25;1;0.25;0.25" keyTimes="0;0;0.0;0.07;1" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="30;30;40;30;30" keyTimes="0;0;0.0;0.07;1" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="720" cy="160" r="28" fill="#19A58E"/><path d="M709,145 h15 l8,8 v22 h-23 z" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M714,162 h12 M714,169 h12" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="720" y="226" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#EAF4F5">Upload</text>
+<circle cx="860" cy="160" r="30" fill="none" stroke="#19C3A6" stroke-width="3"><animate attributeName="opacity" values="0.25;0.25;1;0.25;0.25" keyTimes="0;0.21;0.25;0.32;1" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="30;30;40;30;30" keyTimes="0;0.21;0.25;0.32;1" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="860" cy="160" r="28" fill="#19A58E"/><path d="M845,153 v-8 h8 M867,145 h8 v8 M875,167 v8 h-8 M853,175 h-8 v-8" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M850,160 h20" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="860" y="226" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#EAF4F5">OCR local</text>
+<circle cx="1000" cy="160" r="30" fill="none" stroke="#19C3A6" stroke-width="3"><animate attributeName="opacity" values="0.25;0.25;1;0.25;0.25" keyTimes="0;0.46;0.5;0.57;1" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="30;30;40;30;30" keyTimes="0;0.46;0.5;0.57;1" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="1000" cy="160" r="28" fill="#19A58E"/><path d="M1000,144 l4,10 l10,4 l-10,4 l-4,10 l-4,-10 l-10,-4 l10,-4 z" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1000" y="226" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#EAF4F5">Gemini</text>
+<circle cx="1140" cy="160" r="30" fill="none" stroke="#19C3A6" stroke-width="3"><animate attributeName="opacity" values="0.25;0.25;1;0.25;0.25" keyTimes="0;0.71;0.75;0.82;1" dur="8s" repeatCount="indefinite"/><animate attributeName="r" values="30;30;40;30;30" keyTimes="0;0.71;0.75;0.82;1" dur="8s" repeatCount="indefinite"/></circle>
+<circle cx="1140" cy="160" r="28" fill="#19A58E"/><path d="M1125,148 h30 v20 h-17 l-8,7 v-7 h-5 z" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M1132,156 h16" stroke="#FFFFFF" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1140" y="226" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="18" font-weight="600" fill="#EAF4F5">Chat</text>
+<circle r="9" fill="#F2A93B" cy="160" cx="0"><animateMotion dur="8s" repeatCount="indefinite" path="M720,0 L1140,0" keyPoints="0;1;1" keyTimes="0;0.75;1" calcMode="linear"/><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.74;0.8;1" dur="8s" repeatCount="indefinite"/></circle>
+</svg>
