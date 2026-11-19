@@ -13,7 +13,7 @@
 ![Docker Compose](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
 ![Gemini](https://img.shields.io/badge/AI-Gemini-8E75B2?logo=googlegemini&logoColor=white)
 
-**An AI contract scanner for people who were never taught to read contracts.**
+**An AI that reads contracts and explains them in plain language.**
 Upload a PDF or a photo, get a plain-language summary, and chat about it.
 
 [See it in action](#-see-it-in-action) · [Try it in 1 minute](#-try-it-in-1-minute-demo-mode) · [How it works](#-how-it-works) · [Run the full stack](#-run-the-full-stack) · [API](#-api) · [Team](#-team)
